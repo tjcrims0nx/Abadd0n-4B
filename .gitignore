@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+qlora_env/
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+train*.txt
+error*.log
+pip_out.txt
+
+# Large/Sensitive Data
+dataset.jsonl
+data.txt
+*.jsonl
+
+# Models and Weights
+lora_model/
+dpo_model/
+abadd0n_merged/
+abadd0n_gguf/
+model_weights.pth
+
+# Cache
+unsloth_compiled_cache/
+outputs/
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Installers
+*.exe
+winlibs.zip
+vs_buildtools.exe
+
+# Node
+node_modules/
+package-lock.json
+
+# Jupyter
+.ipynb_checkpoints/
