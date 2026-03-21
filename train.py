@@ -14,6 +14,10 @@ Usage:
 import argparse
 import time
 import torch
+# Patch for torchao / unsloth compatibility
+import pre_unsloth
+pre_unsloth.before_import()
+
 import os
 from llm import Abadd0n, STOI, ITOS, VOCAB_SIZE, block_size
 

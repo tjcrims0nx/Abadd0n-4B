@@ -4,6 +4,7 @@ Abadd0n — Unsloth QLoRA Fine-Tuning Script
 Target:  4 GB VRAM GPU (e.g. RTX 3050 4 GB, GTX 1650 4 GB)
 Model:   Qwen3-0.6B or Llama-3-1B-Instruct (both <2 GB in 4bit)
 Method:  QLoRA via Unsloth + SFTTrainer (instruction tuning, chat template)
+Dataset:  dataset.jsonl — Alpaca or ChatML rows; includes multilingual coding examples (see dataset_builder.py).
 Output:  LoRA adapters  →  optionally merged & exported to GGUF for Ollama
 
 Usage:
@@ -13,12 +14,19 @@ Requirements (run in qlora_env):
     pip install unsloth trl transformers datasets peft bitsandbytes
 """
 
+import torch
+import pre_unsloth
+pre_unsloth.before_import()
+
 if __name__ == '__main__':
     import sys
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     
     # ── Unsloth MUST be imported first ──────────────────────────────────────────
+    import pre_unsloth
+
+    pre_unsloth.before_import()
     import unsloth  # noqa: F401  Must be first for kernel patches
     
     import os
@@ -90,7 +98,8 @@ if __name__ == '__main__':
         max_seq_length  = MAX_SEQ_LENGTH,
         dtype           = DTYPE,
         load_in_4bit    = LOAD_IN_4BIT,
-        # token           = "hf_…",  # Uncomment if using a gated model
+        # token           = "hf_…",
+        attn_implementation = "sdpa",
     )
     
     # Apply the correct chat template for Qwen3 / ChatML format

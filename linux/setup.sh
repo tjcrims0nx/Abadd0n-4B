@@ -1,68 +1,39 @@
-#!/bin/bash
-# Abadd0n Linux/WSL Setup Script
+#!/usr/bin/env bash
+# Abadd0n — Linux / WSL entrypoint for environment setup.
+# WSL2 + GPU: delegates to setup_wsl.sh (venv_wsl + training stack).
+# Native Linux: venv/ + CPU PyTorch + requirements_wsl.txt (install CUDA torch first if you have a GPU).
 
-set -e
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
 echo "========================================"
-echo "  Abadd0n - Linux/WSL Setup"
+echo "  Abadd0n - Linux setup"
 echo "========================================"
 
-# Detect if running in WSL
 if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
-    echo "  Detected: WSL (Windows Subsystem for Linux)"
-    IS_WSL=true
-else
-    echo "  Detected: Native Linux"
-    IS_WSL=false
+  echo "WSL detected — using linux/setup_wsl.sh (venv_wsl, GPU stack)."
+  exec bash linux/setup_wsl.sh
 fi
 
-# Check Python version
-PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-echo "  Python version: $PYTHON_VERSION"
-
-# Create virtual environment
-echo ""
-echo "[1/3] Creating virtual environment..."
+echo "Native Linux — creating venv/ under repo root ..."
 python3 -m venv venv
+# shellcheck source=/dev/null
 source venv/bin/activate
+python -m pip install -q -U pip wheel
 
-# Upgrade pip
-pip install --upgrade pip
+echo "Installing CPU PyTorch wheels (for CUDA, install from pytorch.org first, then skip this step)."
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-# Install CPU version (default)
-echo ""
-echo "[2/3] Installing dependencies (CPU)..."
-pip install -r linux/requirements.txt
+echo "Installing training stack (linux/requirements_wsl.txt) ..."
+pip install -r linux/requirements_wsl.txt
 
-# Optional: GPU support
-if command -v nvidia-smi &> /dev/null; then
-    echo ""
-    echo "  NVIDIA GPU detected!"
-    read -p "  Install PyTorch with CUDA support? (y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-        echo "  ✓ CUDA support enabled"
-    fi
-elif [[ "$IS_WSL" == "true" ]]; then
-    echo ""
-    echo "  WSL detected - for GPU support, install NVIDIA drivers in Windows"
-    echo "  and use WSL2 with CUDA support"
-fi
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available())"
+
+echo "Verifying pre_unsloth inductor compat (no full Unsloth import) ..."
+python -c "import pre_unsloth; pre_unsloth.before_import(); import torch._inductor.config as c; assert 'triton.enable_persistent_tma_matmul' in c._allowed_keys; print('pre_unsloth inductor compat OK')"
 
 echo ""
-echo "[3/3] Verifying installation..."
-python -c "import torch; print(f'  PyTorch: {torch.__version__}'); print(f'  CUDA available: {torch.cuda.is_available()}')"
-
-echo ""
-echo "========================================"
-echo "  Setup complete!"
-echo "========================================"
-echo ""
-echo "To run Abadd0n:"
-echo "  source venv/bin/activate"
-echo "  python main.py"
-echo ""
-echo "To train:"
-echo "  python train.py --epochs 1000 --data data.txt"
-echo ""
+echo "Done.  source venv/bin/activate"
+echo "       python main.py"
+echo "       python linux/wsl_check.py   # full Unsloth smoke test (slow first time)"

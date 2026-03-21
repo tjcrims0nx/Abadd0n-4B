@@ -11,6 +11,8 @@ build/
 # Virtual environments
 qlora_env/
 venv/
+venv_win/
+venv_wsl/
 env/
 .venv/
 

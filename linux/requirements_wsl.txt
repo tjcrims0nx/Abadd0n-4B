@@ -1,0 +1,20 @@
+# Abadd0n — WSL2 / native Linux training stack
+#
+# Prerequisite: PyTorch with CUDA matching your driver (WSL2 usually cu128).
+# Install from https://pytorch.org if needed, e.g.:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#
+# Then (from repo root, venv activated):
+#   pip install -r linux/requirements_wsl.txt
+#
+# Pins match the Windows venv: transformers 5.x breaks Unsloth/torchao import order.
+
+unsloth
+unsloth-zoo
+trl
+transformers==4.57.6
+huggingface_hub==0.36.2
+datasets
+peft
+bitsandbytes
+spinners==0.0.24

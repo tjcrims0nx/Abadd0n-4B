@@ -1,0 +1,23 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# ── Stack alignment (read before upgrading) ─────────────────────────────────
+# Chat + QLoRA/SFT (main.py, unsloth_lora_train.py, dpo_train.py): this file is enough.
+# pre_unsloth.before_import() registers inductor keys (e.g. triton.enable_persistent_tma_matmul)
+# that Unsloth's GRPO patch expects on newer stacks, so PyTorch 2.5.x accepts torch.compile options.
+# For bleeding-edge Unsloth + GRPO, still align torch/Triton with https://github.com/unslothai/unsloth
+# Keep torch / vision / audio on the same minor line (2.5.x).
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
+torchaudio==2.5.1+cu121
+# Built for PyTorch 2.5.x (0.0.27 pins torch==2.4.0 and breaks pip check).
+xformers==0.0.28.post3
+unsloth
+unsloth-zoo
+trl
+# Pin HF stack: transformers 5.x breaks unsloth/torchao int1 patch order on import.
+transformers==4.57.6
+huggingface_hub==0.36.2
+datasets
+peft
+bitsandbytes
+spinners==0.0.24
