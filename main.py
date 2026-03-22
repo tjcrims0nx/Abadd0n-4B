@@ -545,12 +545,13 @@ def _handle_interactive_requests(user_input: str) -> tuple[str, str | None]:
                     pass
             break
 
-    # ── Math: "what is X", "calculate X", "compute X", or pure expression
-    math_prefixes = ("what is ", "what's ", "calculate ", "compute ", "evaluate ", "solve ")
+    # ── Math: "what is X", "whats X", "calculate X", etc.
+    math_prefixes = ("what is ", "what's ", "whats ", "calculate ", "compute ", "evaluate ", "solve ")
     for p in math_prefixes:
         if lower.startswith(p):
             expr = raw[len(p):].strip().rstrip("?")
             expr = expr.replace("% of ", "*0.01*").replace("% of", "*0.01*")
+            expr = re.sub(r"(\d+)\s*[xX×]\s*(\d+)", r"\1*\2", expr)  # 10x10 -> 10*10
             try:
                 from core.math_tool import evaluate_math
                 r = evaluate_math(expr)
@@ -562,13 +563,13 @@ def _handle_interactive_requests(user_input: str) -> tuple[str, str | None]:
                 pass
             break
 
-    # Pure math expression (e.g. "2+3*4" or "sqrt(16)"): short, no spaces, has operators/digits
+    # Pure math expression (e.g. "2+3*4", "10x10", "sqrt(16)"): short, no spaces
     if raw and len(raw) < 60 and " " not in raw:
-        math_chars = set("0123456789+-*/.()%e ")
-        if any(c in raw for c in "+-*/()") or "sqrt" in lower or "sin" in lower or "cos" in lower:
+        pure_expr = re.sub(r"(\d+)\s*[xX×]\s*(\d+)", r"\1*\2", raw)  # 10x10 -> 10*10
+        if any(c in pure_expr for c in "+-*/()") or "sqrt" in lower or "sin" in lower or "cos" in lower or re.search(r"\d+[xX×]\d+", raw):
             try:
                 from core.math_tool import evaluate_math
-                r = evaluate_math(raw)
+                r = evaluate_math(pure_expr)
                 if r.get("ok"):
                     direct = f"{LABEL}{r['result']}{RESET}"
                     return (raw, direct)
@@ -697,6 +698,7 @@ def print_stylized_header():
         ansi_center(
             f"{DIM}Tab{RESET} {GRAY}quick{RESET}  "
             f"{DIM}/{RESET} {GRAY}menu{RESET}  "
+            f"{DIM}\u2192{RESET} {GRAY}suggest{RESET}  "
             f"{LABEL}exit{RESET} {LABEL}clear{RESET} {LABEL}tools{RESET}",
             cols,
         ),
@@ -901,6 +903,13 @@ def handle_file_edits(response):
         except OSError as e:
             print(theme_error("Write failed", f"{safe}: {e}"))
 
+# Common phrases for predictive text (prefix -> completion)
+_PREDICTIVE_PHRASES = [
+    "what is ", "whats ", "how do I ", "search for ", "calculate ", "compute ",
+    "write a ", "explain ", "create a ", "show me ", "help me ", "why does ",
+    "can you ", "tell me ", "give me ", "find ", "look up ", "solve ",
+]
+
 # Quick actions (Tab to cycle, Enter to select)
 _QUICK_ACTIONS = [
     ("exit", "exit"),
@@ -1032,11 +1041,46 @@ def _handle_platform_slash(user_input: str, conversation_history: list) -> bool:
     return False
 
 
-def _prompt_with_quick_actions(prompt_str: str) -> str:
+def _get_suggestion(prefix: str, conversation_history: list) -> str | None:
     """
-    Read input with Tab cycling (quick actions) and / for slash menu.
+    Return suggested suffix based on prefix (from history + common phrases).
+    Used for predictive / smart typing.
+    """
+    if not prefix or not prefix.strip():
+        return None
+    prefix_lo = prefix.lower()
+    sources: list[str] = []
+    for m in conversation_history:
+        if isinstance(m, dict) and m.get("role") == "user":
+            c = (m.get("content") or "").strip()
+            if c and c not in sources:
+                sources.append(c)
+    for p in _PREDICTIVE_PHRASES:
+        if p not in sources:
+            sources.append(p)
+    for s in sources:
+        if s.lower().startswith(prefix_lo) and len(s) > len(prefix):
+            return s[len(prefix):]
+    return None
+
+
+def _redraw_line(prompt_str: str, buf: list[str], suggestion: str | None) -> None:
+    """Redraw input line with optional dimmed suggestion (fish-shell style)."""
+    sys.stdout.write("\r\033[2K")
+    line = "".join(buf)
+    sys.stdout.write(prompt_str)
+    sys.stdout.write(line)
+    if suggestion:
+        sys.stdout.write(f"{DIM}{suggestion}{RESET}")
+    sys.stdout.flush()
+
+
+def _prompt_with_quick_actions(prompt_str: str, conversation_history: list | None = None) -> str:
+    """
+    Read input with Tab cycling (quick actions), / for slash menu, Right arrow for predictive text.
     Returns user input or a command (exit, clear, /tools, /settings, etc.).
     """
+    history = conversation_history or []
     try:
         from readchar import readkey, key
     except ImportError:
@@ -1101,13 +1145,12 @@ def _prompt_with_quick_actions(prompt_str: str) -> str:
                 continue
             buf.append("/")
             _clear_menu()
-            sys.stdout.write("\r\033[2K" + prompt_str + "/")
             slash_sel = -1
             menu_lines = 0
             if len(k) == 1 and k.isprintable():
                 buf.append(k)
-                sys.stdout.write(k)
-            sys.stdout.flush()
+            sug = _get_suggestion("".join(buf), history)
+            _redraw_line(prompt_str, buf, sug)
             continue
 
         if k == key.ENTER or k in ("\r", "\n"):
@@ -1135,9 +1178,16 @@ def _prompt_with_quick_actions(prompt_str: str) -> str:
         if k in (key.BACKSPACE, "\x7f"):
             if buf:
                 buf.pop()
-                sys.stdout.write("\b \b")
-                sys.stdout.flush()
+                sug = _get_suggestion("".join(buf), history)
+                _redraw_line(prompt_str, buf, sug)
             sel = -1
+            continue
+        if k in (key.RIGHT, "\x1b[C"):
+            line = "".join(buf)
+            sug = _get_suggestion(line, history)
+            if sug:
+                buf.extend(list(sug))
+                _redraw_line(prompt_str, buf, None)
             continue
         if len(k) == 1 and k.isprintable():
             if k == "/" and not buf:
@@ -1145,8 +1195,8 @@ def _prompt_with_quick_actions(prompt_str: str) -> str:
                 menu_lines = _draw_slash_menu(0, prompt_str)
                 continue
             buf.append(k)
-            sys.stdout.write(k)
-            sys.stdout.flush()
+            sug = _get_suggestion("".join(buf), history)
+            _redraw_line(prompt_str, buf, sug)
             sel = -1
     return ""
 
@@ -1182,7 +1232,7 @@ def main():
     while True:
         try:
             prompt_str = f"\n{GRAY}{BOX_V}{RESET} {LABEL}Message{RESET} {ACCENT}\u2192{RESET} "
-            user_input = _prompt_with_quick_actions(prompt_str)
+            user_input = _prompt_with_quick_actions(prompt_str, conversation_history)
 
         except (EOFError, KeyboardInterrupt):
             print(f"\n{GRAY}{ICON_ARROW}{RESET} {DIM}EOF \u2014 exiting{RESET}")

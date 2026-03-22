@@ -7,7 +7,7 @@
 > **⚠️ WORK IN PROGRESS (WIP)**  
 > This vessel is still awakening. Expect breaking changes and ominous prophecies.
 
-**Abadd0n** is a custom-architected LLM and AI agent designed for high-efficiency training and inference on consumer hardware (4 GB VRAM budget). It mimics modern design patterns from Llama-3 and Qwen3 to provide a powerful, character-driven experience. Engage via a stylized terminal chat: Tab quick actions, `/` slash menu, syntax highlighting, and ClawHub skills.
+**Abadd0n** is a custom-architected LLM and AI agent designed for high-efficiency training and inference on consumer hardware (4 GB VRAM budget). It mimics modern design patterns from Llama-3 and Qwen3 to provide a powerful, character-driven experience. Engage via a stylized terminal chat: Tab quick actions, `/` slash menu, **Right arrow** for predictive text (history + common phrases), syntax highlighting, and ClawHub skills.
 
 ---
 
@@ -22,8 +22,8 @@ Abadd0n uses a decoder-only transformer architecture with:
 ## 🚀 Features
 - **Unsloth Integration**: Optimized for 2x faster 4-bit QLoRA fine-tuning.
 - **Core Platform**: Gateway (WS control), agent (RPC), session model, media pipeline stubs. CLI: `gateway`, `agent`, `send`, `onboarding`, `doctor`.
-- **CLI**: Slash menu (`/`), Tab quick actions, syntax highlighting, file tools (`/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`).
-- **Math & search**: Chat accepts "what is 2+3*4", "search for Python tutorial", "google asyncio" — math is evaluated directly; search enriches context via Google. `/math` and `/search` slash commands also work.
+- **CLI**: Slash menu (`/`), Tab quick actions, **Right arrow** predictive text (suggestions from history + common phrases), syntax highlighting, file tools (`/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`).
+- **Math & search**: Chat accepts "what is 2+3*4", "whats 10x10", "search for Python tutorial", "google asyncio" — math is evaluated directly (`x` and `×` treated as multiplication); search enriches context via Google. `/math` and `/search` slash commands also work.
 - **ClawHub skills**: Interactive search bar (`/skills`), browse, search, and install [OpenClaw skills](https://clawhub.ai) via `/skills install <slug>` (add `--global` for all projects); skills injected into agent.
 - **Docs & fetch**: `/docs <query>` searches [docs.openclaw.ai](https://docs.openclaw.ai); `/fetch <url>` retrieves page content; `/patch <file>` applies OpenClaw-style patches.
 - **DPO (Direct Preference Optimization)**: Alignment script included for human preference tuning.
@@ -64,6 +64,8 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `linux/setup.sh` | Native Linux: `venv/` + CPU PyTorch + `requirements_wsl.txt` + `pre_unsloth` check; on WSL delegates to `setup_wsl.sh` |
 | `linux/requirements_wsl.txt` | Unsloth + TRL + pinned HF + rich/readchar + web search (no PyTorch — install torch in venv first on Linux) |
 | `linux/wsl_check.py` | Torch + `pre_unsloth` + inductor assert + `import unsloth` (use after Linux/WSL install) |
+| `clean.bat` | Windows: remove `__pycache__`, `unsloth_compiled_cache` (keeps lora_model, outputs) |
+| `linux/clean.sh` | Linux/WSL: same cleanup |
 
 | `assets/abaddon-cli.png` | README hero image (CLI screenshot) |
 | `tests/` | Unit tests: `test_tools.py` for tools, `/docs`, `/fetch` |
@@ -228,6 +230,7 @@ python cli.py
 ```
 - Type messages at the prompt; `exit` quits; `clear` resets conversation memory.
 - **Tab:** quick actions (exit, clear, tools). **/** slash menu: settings, gateway, agent, send, media, onboarding, doctor.
+- **Right arrow:** accept predictive suggestion (from history or common phrases like "what is ", "search for ").
 - **Slash menu:** press `/` for dropdown (clear, settings, tools, gateway, agent, send, media, onboarding, doctor, exit). Tab cycles, Enter selects.
 - **Slash tools:** `/tools` for `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn` — inspect and syntax-check files. `/math <expr>`, `/search <query>` (Google). `/skills` (search bar, browse, install), `/docs <query>`, `/fetch <url>`, `/patch <file>`, `/grant`, `/new`.
 - **Interactive math & search:** In chat, type "what is 2+3*4" or "search for Python asyncio" — math evaluates directly; search fetches Google results and injects context.

@@ -8,6 +8,7 @@ from __future__ import annotations
 import ast
 import math
 import operator
+import re
 
 # Whitelist of builtins for safe eval
 _SAFE_NAMESPACE = {
@@ -43,6 +44,8 @@ def evaluate_math(expr: str) -> dict:
     expr = (expr or "").strip()
     if not expr:
         return {"ok": False, "error": "Empty expression"}
+    # Normalize "10x10" / "10×10" -> "10*10" (common human notation)
+    expr = re.sub(r"(\d+)\s*[xX×]\s*(\d+)", r"\1*\2", expr)
     try:
         tree = ast.parse(expr, mode="eval")
         result = _eval_node(tree.body)

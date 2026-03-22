@@ -25,7 +25,7 @@ if ! python -c "import torch" 2>/dev/null; then
   echo ""
   echo "[setup_wsl] PyTorch is not installed in this venv."
   echo "Install CUDA wheels first (pick the index that matches your GPU driver), e.g.:"
-  echo "  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128"
+  echo "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128"
   echo "Then re-run:  bash linux/setup_wsl.sh"
   exit 1
 fi
