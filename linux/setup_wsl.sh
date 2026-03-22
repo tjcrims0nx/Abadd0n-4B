@@ -37,6 +37,7 @@ fi
 echo "[setup_wsl] Installing Unsloth + training deps …"
 echo "  NOTE: Large packages (PyTorch, Unsloth, etc.) — may take several minutes."
 pip install -r linux/requirements_wsl.txt
+pip check || true
 
 echo "[setup_wsl] Verifying pre_unsloth + Unsloth import (first run can take 5–20+ min on /mnt/c — be patient) …"
 PYTHONUNBUFFERED=1 python -u linux/wsl_check.py

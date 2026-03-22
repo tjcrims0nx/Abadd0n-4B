@@ -12,15 +12,16 @@ torchvision==0.20.1+cu121
 torchaudio==2.5.1+cu121
 # Built for PyTorch 2.5.x (0.0.27 pins torch==2.4.0 and breaks pip check).
 xformers==0.0.28.post3
-unsloth
-unsloth-zoo
-trl
+# Unsloth + zoo: tested with 2026.3.x; align with https://github.com/unslothai/unsloth if issues
+unsloth>=2026.3.0
+unsloth-zoo>=2026.3.0
+trl>=0.24.0,<0.30
 # Pin HF stack: transformers 5.x breaks unsloth/torchao int1 patch order on import.
 transformers==4.57.6
 huggingface_hub==0.36.2
-datasets
-peft
-bitsandbytes
+datasets>=4.3.0
+peft>=0.18.0
+bitsandbytes>=0.49.0
 spinners==0.0.24
 # CLI: slash menu, Tab quick actions, syntax highlighting, panels
 rich>=13.0.0

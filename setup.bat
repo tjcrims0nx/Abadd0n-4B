@@ -50,6 +50,10 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+pip check
+if errorlevel 1 (
+    echo WARNING: pip check reported dependency conflicts — see above
+)
 
 echo [4/6] Verifying PyTorch ...
 python -c "import torch; print('  PyTorch:', torch.__version__); print('  CUDA:', torch.cuda.is_available())"

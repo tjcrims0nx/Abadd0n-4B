@@ -33,6 +33,7 @@ fi
 echo "Installing training stack (linux/requirements_wsl.txt) ..."
 echo "  NOTE: Includes large packages (PyTorch, Unsloth, etc.) — may take several minutes."
 pip install -r linux/requirements_wsl.txt
+pip check || true
 
 python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available())"
 
