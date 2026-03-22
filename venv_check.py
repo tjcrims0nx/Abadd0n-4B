@@ -24,7 +24,7 @@ def require_abaddon_venv() -> None:
         "  Windows:  venv_win\\Scripts\\activate\n"
         "  WSL:      source venv_wsl/bin/activate\n"
         "  Linux:    source venv/bin/activate\n\n"
-        "Then:  python main.py   (or export_ollama.py, unsloth_lora_train.py)"
+        "Then:  python main.py   (or unsloth_lora_train.py, export_hf.py)"
     )
     print(msg, file=sys.stderr)
     sys.exit(1)

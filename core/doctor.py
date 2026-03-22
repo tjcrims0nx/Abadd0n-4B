@@ -11,12 +11,12 @@ if str(_root) not in sys.path:
 def run_doctor(args=None) -> int:
     """Run diagnostics."""
     # Minimal implementation: reuse check_torch / debug_unsloth style checks
-    print("\nAbadd0n Doctor \u2014 diagnostics")
+    print("\nAbadd0n Doctor - diagnostics")
     try:
         from cli_theme import success, error as theme_error, muted
     except ImportError:
-        def success(m, d=""): print(f"  \u2713 {m}" + (f" {d}" if d else ""))
-        def theme_error(m, d=""): print(f"  \u2717 {m}" + (f" {d}" if d else ""))
+        def success(m, d=""): print(f"  [OK] {m}" + (f" {d}" if d else ""))
+        def theme_error(m, d=""): print(f"  [X] {m}" + (f" {d}" if d else ""))
         muted = lambda m: print(f"  {m}")
 
     checks = []

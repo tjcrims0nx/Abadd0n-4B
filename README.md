@@ -48,10 +48,9 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `cli_theme.py` | CLI design system (colors, icons, spacing per [CLI guidelines](https://yannglt.com/writing/designing-for-command-line-interface)) |
 | `coding_tools.py` | Local `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`; `/docs`, `/fetch`, `/patch`; `/skills` (ClawHub) |
 | `pre_unsloth.py` | Env prep before `import unsloth` (caches + compatibility shims for torch.compile options) |
-| `unsloth_lora_train.py` | QLoRA SFT (`dataset.jsonl` → `lora_model/`); set `EXPORT_GGUF=True` for one-shot Ollama export |
-| `export_ollama.py` | Export `lora_model/` to GGUF + Modelfile, create Ollama model **Abadd0n-4B** |
-| `ollama_export.py` | Shared Modelfile generation and LoRA → GGUF → Ollama pipeline |
-| `persona.py` | Shared Abadd0n system persona (main.py + Ollama Modelfile) |
+| `unsloth_lora_train.py` | QLoRA SFT (`dataset.jsonl` → `lora_model/`) |
+| `export_hf.py` | Push LoRA/merged/GGUF to Hugging Face Hub |
+| `persona.py` | Shared Abadd0n system persona for main.py chat |
 | `dpo_train.py` | DPO alignment (optional, after SFT) |
 | `train.py` | Character-level pre-train (`llm.py` + `data.txt`) |
 | `llm.py` | Small custom decoder for `train.py` |
@@ -64,13 +63,13 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `linux/setup.sh` | Native Linux: `venv/` + CPU PyTorch + `requirements_wsl.txt` + `pre_unsloth` check; on WSL delegates to `setup_wsl.sh` |
 | `linux/requirements_wsl.txt` | Unsloth + TRL + pinned HF + rich/readchar + web search (no PyTorch — install torch in venv first on Linux) |
 | `linux/wsl_check.py` | Torch + `pre_unsloth` + inductor assert + `import unsloth` (use after Linux/WSL install) |
-| `clean.bat` | Windows: remove `__pycache__`, `unsloth_compiled_cache` (keeps lora_model, outputs) |
+| `clean.bat` | Windows: remove `__pycache__`, `unsloth_compiled_cache`, old export dirs (`abadd0n_merged`, `abadd0n_gguf`, `abadd0n_gguf_gguf`), test artifacts (keeps lora_model, outputs) |
 | `linux/clean.sh` | Linux/WSL: same cleanup |
 
 | `assets/abaddon-cli.png` | README hero image (CLI screenshot) |
 | `tests/` | Unit tests: `test_tools.py` for tools, `/docs`, `/fetch` |
 
-Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_compiled_cache/`, `venv_win/`, `venv_wsl/`, `venv/`, `conversations/`, `__pycache__/`.
+Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_compiled_cache/`, `abadd0n_merged/`, `abadd0n_gguf/`, `abadd0n_gguf_gguf/`, `venv_win/`, `venv_wsl/`, `venv/`, `conversations/`, `__pycache__/`.
 
 ---
 
@@ -202,20 +201,25 @@ python unsloth_lora_train.py
 ```
 Checkpoints also go under `outputs/` per script defaults.
 
-### 2) Export to Ollama (Abadd0n-4B)
+**Larger base:** For a true 4B model, use `unsloth/Qwen3-4B-bnb-4bit` as `MODEL_NAME` in `unsloth_lora_train.py` (needs ~8 GB VRAM).
 
-After training (or if `lora_model/` already exists), export to [Ollama](https://ollama.com) as **Abadd0n-4B**:
+### 2) Export to Hugging Face Hub (optional)
+
+Push your trained model to [Hugging Face](https://huggingface.co). Set `HF_TOKEN` or run `huggingface-cli login`:
 
 ```bash
-venv_win\Scripts\activate    # Windows (or source venv_wsl/bin/activate on WSL)
-python export_ollama.py
+# LoRA adapters only (small, users load with base model)
+python export_hf.py USERNAME/Abadd0n1.0-bnb-4bit --lora-only
+
+# Merged 16bit model (standalone)
+python export_hf.py USERNAME/Abadd0n1.0-bnb-4bit --merged
+
+# Also push GGUF (q4_k_m)
+python export_hf.py USERNAME/Abadd0n1.0-bnb-4bit --merged --gguf
+
+# Private repo
+python export_hf.py USERNAME/Abadd0n1.0-bnb-4bit --lora-only --private
 ```
-
-This merges LoRA, exports to GGUF, writes a Modelfile with the Abadd0n persona, and runs `ollama create Abadd0n-4B`. Use `--no-create` to only produce GGUF + Modelfile without invoking Ollama.
-
-**During training:** Set `EXPORT_GGUF = True` in `unsloth_lora_train.py` to export automatically after a run (writes to `abadd0n_gguf/`). Requires `ollama` in `PATH` for `ollama create`.
-
-**Larger base:** For a true 4B model, use `unsloth/Qwen3-4B-bnb-4bit` as `MODEL_NAME` in `unsloth_lora_train.py` (needs ~8 GB VRAM).
 
 ### 3) Chat
 ```bash

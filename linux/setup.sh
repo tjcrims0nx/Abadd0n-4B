@@ -25,6 +25,10 @@ python -m pip install -q -U pip wheel
 echo "Installing CPU PyTorch wheels (for CUDA, install from pytorch.org first, then skip this step)."
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
+if [ ! -f "linux/requirements_wsl.txt" ]; then
+  echo "ERROR: linux/requirements_wsl.txt not found. Run from repo root."
+  exit 1
+fi
 echo "Installing training stack (linux/requirements_wsl.txt) ..."
 pip install -r linux/requirements_wsl.txt
 
@@ -40,4 +44,4 @@ echo "  Slash:    /math <expr>  |  /search <query>"
 echo "  Doctor:   python cli.py doctor"
 echo "  Tools:    python -m tests.test_tools --skip-network"
 echo "  Dataset:  python dataset_builder.py --generate --validate"
-echo "  QLoRA:    python unsloth_lora_train.py  |  Export:  python export_ollama.py"
+echo "  QLoRA:    python unsloth_lora_train.py  |  HF:  python export_hf.py USER/repo --lora-only"

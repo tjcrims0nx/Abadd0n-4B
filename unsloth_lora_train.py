@@ -5,7 +5,7 @@ Target:  4 GB VRAM GPU (e.g. RTX 3050 4 GB, GTX 1650 4 GB)
 Model:   Qwen3-0.6B or Llama-3-1B-Instruct (both <2 GB in 4bit)
 Method:  QLoRA via Unsloth + SFTTrainer (instruction tuning, chat template)
 Dataset:  dataset.jsonl — Alpaca or ChatML rows; includes multilingual coding examples (see dataset_builder.py).
-Output:  LoRA adapters  →  optionally merged & exported to GGUF for Ollama
+Output:  LoRA adapters  →  lora_model/ (for main.py chat)
 
 Usage (activate venv first):
     venv_win\\Scripts\\activate   # Windows
@@ -84,10 +84,6 @@ if __name__ == '__main__':
     MAX_STEPS         = -1            # -1 = run full epochs; set e.g. 100 to cap
     LOGGING_STEPS     = 5
     SAVE_STEPS        = 50
-    
-    EXPORT_GGUF       = False   # Set True to save GGUF after training (needs llama.cpp)
-    GGUF_QUANT        = "q4_k_m"
-    OLLAMA_MODEL_NAME = "Abadd0n-4B"
     
     print("=" * 60)
     print("  Abadd0n — QLoRA Fine-Tuning (Unsloth / Qwen3)")
@@ -256,25 +252,6 @@ if __name__ == '__main__':
         model.save_pretrained(LORA_OUTPUT_DIR)
         tokenizer.save_pretrained(LORA_OUTPUT_DIR)
         print("  [OK] Adapters saved")
-    
-        # ── Optional: merge + save GGUF for Ollama ──────────────
-        if EXPORT_GGUF:
-            from ollama_export import write_modelfile
-            from persona import PERSONA
-
-            gguf_dir = "abadd0n_gguf"
-            print(f"\nExporting merged model to GGUF ({GGUF_QUANT}) …")
-            model.save_pretrained_merged("abadd0n_merged", tokenizer, save_method="merged_16bit")
-            model.save_pretrained_gguf(gguf_dir, tokenizer, quantization_method=GGUF_QUANT)
-            write_modelfile(
-                gguf_dir,
-                model_name=OLLAMA_MODEL_NAME,
-                persona=PERSONA,
-                num_ctx=MAX_SEQ_LENGTH,
-                temperature=0.8,
-            )
-            print(f"  [OK] GGUF + Modelfile saved to ./{gguf_dir}")
-            print(f"      ollama create {OLLAMA_MODEL_NAME} -f ./{gguf_dir}/Modelfile")
     
         print("\n╔══════════════════════════════════╗")
         print("║  Abadd0n training complete! [OK] ║")

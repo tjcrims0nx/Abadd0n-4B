@@ -30,6 +30,10 @@ if ! python -c "import torch" 2>/dev/null; then
   exit 1
 fi
 
+if [ ! -f "linux/requirements_wsl.txt" ]; then
+  echo "[setup_wsl] ERROR: linux/requirements_wsl.txt not found. Run from repo root."
+  exit 1
+fi
 echo "[setup_wsl] Installing Unsloth + training deps …"
 pip install -r linux/requirements_wsl.txt
 
@@ -43,4 +47,4 @@ echo "  Slash:    /math <expr>  |  /search <query>"
 echo "  Doctor:   python cli.py doctor"
 echo "  Tools:    python -m tests.test_tools --skip-network"
 echo "  Dataset:  python dataset_builder.py --generate --validate"
-echo "  QLoRA:    python unsloth_lora_train.py  |  Export:  python export_ollama.py"
+echo "  QLoRA:    python unsloth_lora_train.py  |  HF:  python export_hf.py USER/repo --lora-only"

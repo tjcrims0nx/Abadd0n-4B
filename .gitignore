@@ -38,6 +38,7 @@ lora_model/
 dpo_model/
 abadd0n_merged/
 abadd0n_gguf/
+abadd0n_gguf_gguf/
 *.gguf
 model_weights.pth
 

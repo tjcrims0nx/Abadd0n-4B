@@ -5,6 +5,19 @@ Principles: systematic ANSI colors, UTF-8 iconography, consistent spacing (1ch h
 1 line vertical), bold for labels / dim for secondary. Works in light & dark terminals.
 """
 
+import sys
+
+
+def _stdout_supports_unicode() -> bool:
+    """True if stdout can encode common Unicode icons (avoids cp1252 etc. on Windows)."""
+    try:
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        "\u2713\u2717".encode(enc)
+        return True
+    except (UnicodeEncodeError, AttributeError):
+        return False
+
+
 # ── ANSI colors (16 base + bright; use FG_DEFAULT for readable foreground) ───
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -36,15 +49,16 @@ BOX_BL, BOX_BR = "\u2514", "\u2518"
 BOX_H, BOX_V = "\u2500", "\u2502"
 BOX_LIGHT = "\u2500"  # light horizontal
 
-# UTF-8 iconography
-ICON_SUCCESS = "\u2713"   # ✓
-ICON_WARNING = "\u26a0"   # ⚠
-ICON_ERROR = "\u2717"    # ✗
-ICON_ARROW = "\u2192"    # →
-ICON_BULLET = "\u2022"   # •
-ICON_INDENT = "\u2502"   # │
-ICON_BRANCH = "\u251c"   # ├
-ICON_END = "\u2514"      # └
+# UTF-8 iconography (ASCII fallback for cp1252/cp437)
+_UTF8 = _stdout_supports_unicode()
+ICON_SUCCESS = "\u2713" if _UTF8 else "[OK]"
+ICON_WARNING = "\u26a0" if _UTF8 else "!"
+ICON_ERROR = "\u2717" if _UTF8 else "X"
+ICON_ARROW = "\u2192" if _UTF8 else "->"
+ICON_BULLET = "\u2022" if _UTF8 else "*"
+ICON_INDENT = "\u2502" if _UTF8 else "|"
+ICON_BRANCH = "\u251c" if _UTF8 else "|"
+ICON_END = "\u2514" if _UTF8 else "`"
 
 # Spacing (1ch = one character width in monospace)
 INDENT_1 = "  "

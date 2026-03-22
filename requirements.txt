@@ -1,6 +1,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu121
 
 # ── Stack alignment (read before upgrading) ─────────────────────────────────
+# Python 3.10+ required. Windows: CUDA 12.1 stack.
 # Chat + QLoRA/SFT (main.py, unsloth_lora_train.py, dpo_train.py): this file is enough.
 # pre_unsloth.before_import() registers inductor keys (e.g. triton.enable_persistent_tma_matmul)
 # that Unsloth's GRPO patch expects on newer stacks, so PyTorch 2.5.x accepts torch.compile options.

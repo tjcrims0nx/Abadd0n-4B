@@ -61,7 +61,7 @@ source venv/bin/activate
 | Tools test | `python -m tests.test_tools --skip-network` |
 | Dataset | `python dataset_builder.py --generate --validate` |
 | QLoRA | `python unsloth_lora_train.py` |
-| Export | `python export_ollama.py` |
+| HF export | `python export_hf.py USER/repo --lora-only` |
 
 **Always activate the venv first** (`venv_wsl` on WSL, `venv` on native Linux).
 

@@ -711,8 +711,14 @@ def load_model_and_tokenizer():
     print(f"\n{GRAY}\u2502{RESET} {DIM}Loading model and tokenizer{RESET} ...")
 
     hf_token = os.environ.get("HF_TOKEN")
+    lora_path = Path(__file__).resolve().parent / "lora_model"
+    has_lora = (lora_path / "config.json").exists() or (lora_path / "adapter_config.json").exists()
+    model_name = "lora_model" if has_lora else "unsloth/Qwen3-0.6B-bnb-4bit"
+    if not has_lora:
+        print(f"{DIM}\u2502{RESET} {DIM}No lora_model/ — using base model (run unsloth_lora_train.py to train){RESET}")
+
     load_kw = dict(
-        model_name="lora_model",
+        model_name=model_name,
         max_seq_length=2048,
         load_in_4bit=True,
         attn_implementation="sdpa",

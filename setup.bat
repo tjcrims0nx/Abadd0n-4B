@@ -37,6 +37,11 @@ echo [2/5] Upgrading pip ...
 python -m pip install -q --upgrade pip wheel
 
 echo [3/5] Installing dependencies ^(root requirements.txt, CUDA 12.1 index^) ...
+if not exist "%~dp0requirements.txt" (
+    echo ERROR: requirements.txt not found. Run setup.bat from repo root.
+    pause
+    exit /b 1
+)
 pip install -r "%~dp0requirements.txt"
 if errorlevel 1 (
     echo ERROR: pip install failed
@@ -71,7 +76,7 @@ echo   Doctor:   python cli.py doctor
 echo   Tools:    python -m tests.test_tools --skip-network
 echo   Dataset:  python dataset_builder.py --generate --validate
 echo   QLoRA:    python unsloth_lora_train.py
-echo   Export:   python export_ollama.py   (lora_model/ -^> Ollama)
+echo   HF:       python export_hf.py USERNAME/repo --lora-only
 echo ========================================
 pause
 endlocal
