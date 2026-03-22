@@ -14,27 +14,20 @@ import contextlib
 import signal
 from pathlib import Path
 
-# ── ANSI theme (must exist before import-time patch below uses GRAY) ─────────
-RESET = "\033[0m"
-BOLD = "\033[1m"
-DIM = "\033[2m"
-RED = "\033[31m"
-DARK_RED = "\033[91m"
-YELLOW = "\033[33m"
-GREEN = "\033[32m"
-GRAY = "\033[90m"
-WHITE = "\033[97m"
-FG_DEFAULT = "\033[39m"  # host default foreground (readable on light & dark terminals)
-LABEL = "\033[94m"  # bright blue — UI labels
-ACCENT = "\033[96m"  # bright cyan — emphasis
-CYAN = "\033[36m"  # classic cyan (header, compat)
-CODE_FG = "\033[90m"  # code inside markdown fences
-FENCE_FG = "\033[33m"  # ``` language lines
+# ── CLI design system (colors, icons, spacing) ───────────────────────────────
+from cli_theme import (
+    ACCENT, BOLD, CODE_FG, DIM, FG_DEFAULT, FENCE_FG, GRAY, GREEN, LABEL, RED, RESET,
+    WHITE, YELLOW, BOX_BL, BOX_BR, BOX_H, BOX_TL, BOX_TR, BOX_V,
+    ICON_ARROW, ICON_BULLET, ICON_ERROR, ICON_SUCCESS, ICON_WARNING,
+    muted, success, warning, error as theme_error,
+)
 
-# Light single-line box for markdown code bodies (compact on screen)
-CODE_BOX_TL, CODE_BOX_TR = "\u250c", "\u2510"
-CODE_BOX_BL, CODE_BOX_BR = "\u2514", "\u2518"
-CODE_BOX_H, CODE_BOX_V = "\u2500", "\u2502"
+# Aliases for existing usages
+CODE_BOX_TL, CODE_BOX_TR = BOX_TL, BOX_TR
+CODE_BOX_BL, CODE_BOX_BR = BOX_BL, BOX_BR
+CODE_BOX_H, CODE_BOX_V = BOX_H, BOX_V
+DARK_RED = "\033[91m"
+CYAN = "\033[36m"
 
 
 def _thinking_spinner_frames_interval():
@@ -52,7 +45,7 @@ def _thinking_spinner_frames_interval():
 def spinner_context(tty_enabled: bool = True):
     """Spinner while the model generates; cleans up on first token or cancel."""
     if not tty_enabled:
-        sys.stdout.write(f"\n{GRAY}Abadd0n:{RESET} {FG_DEFAULT} ")
+        sys.stdout.write(f"\n{GRAY}Abadd0n{RESET} {DIM}\u2192{RESET} {FG_DEFAULT} ")
         sys.stdout.flush()
         yield lambda: None
         return
@@ -65,7 +58,7 @@ def spinner_context(tty_enabled: bool = True):
         i = 0
         while not stop_event.wait(tick):
             fr = frames[i % len(frames)]
-            sys.stdout.write(f"\r{GRAY}Abadd0n is thinking{RESET} {fr} ")
+            sys.stdout.write(f"\r{GRAY}Abadd0n{RESET} {DIM}thinking{RESET} {fr} ")
             sys.stdout.flush()
             i += 1
 
@@ -78,7 +71,7 @@ def spinner_context(tty_enabled: bool = True):
         reply_started[0] = True
         stop_event.set()
         thread.join(timeout=0.5)
-        sys.stdout.write(f"\r\033[K{GRAY}Abadd0n:{RESET} {FG_DEFAULT} ")
+        sys.stdout.write(f"\r\033[K{GRAY}Abadd0n{RESET} {DIM}\u2192{RESET} {FG_DEFAULT} ")
         sys.stdout.flush()
 
     try:
@@ -118,9 +111,9 @@ def patch_unsloth_qwen3_rope_broadcast():
         qwen3_models.Qwen3Attention_fast_forward_inference = ns[
             "Qwen3Attention_fast_forward_inference"
         ]
-        print(f"{GRAY}Abadd0n: Qwen3 RoPE broadcast fix applied.{RESET}")
+        print(muted("Abadd0n: Qwen3 RoPE broadcast fix applied."))
     except Exception as e:
-        print(f"{GRAY}Abadd0n: Qwen3 RoPE patch failed ({e}).{RESET}")
+        print(theme_error(f"Abadd0n: Qwen3 RoPE patch failed ({e})."))
 
 
 # Disable with ABADDON_QWEN3_INFER_PATCH=0 if you need stock Unsloth for debugging.
@@ -144,6 +137,42 @@ import re
 
 from coding_tools import handle_slash_command
 
+try:
+    from rich.console import Console
+    from rich.syntax import Syntax
+    from rich.panel import Panel
+    _RICH_AVAILABLE = True
+except ImportError:
+    _RICH_AVAILABLE = False
+
+
+def _print_user_prompt_box(text: str) -> None:
+    """Render user input in a Composer-style dark box with subtle border."""
+    if not text.strip():
+        return
+    if _RICH_AVAILABLE:
+        console = Console()
+        console.print(
+            Panel(
+                text.strip(),
+                title="[bold blue]You[/]",
+                border_style="dim",
+                padding=(0, 1),
+                expand=False,
+            )
+        )
+    else:
+        w = shutil.get_terminal_size(fallback=(80, 24)).columns - 4
+        w = max(40, min(76, w))
+        print(f"\n{GRAY}{BOX_TL}{BOX_H * (w - 2)}{BOX_TR}{RESET}")
+        print(f"{GRAY}{BOX_V}{RESET} {LABEL}You{RESET} {FG_DEFAULT}{text.strip()}{RESET}")
+        print(f"{GRAY}{BOX_BL}{BOX_H * (w - 2)}{BOX_BR}{RESET}\n")
+
+
+def _cli_panel_width() -> int:
+    cols, _ = shutil.get_terminal_size(fallback=(80, 24))
+    return max(52, min(78, cols - 4))
+
 
 class _ReplyStreamer(TextStreamer):
     """Prose + markdown fences; code bodies render in a box fitted to content width."""
@@ -156,6 +185,7 @@ class _ReplyStreamer(TextStreamer):
         self._in_code = False
         self._pending = ""
         self._code_accum = ""
+        self._code_lang = ""
 
     def put(self, value):
         if self._on_first_put is not None:
@@ -174,9 +204,30 @@ class _ReplyStreamer(TextStreamer):
                 break
         return n
 
-    def _flush_code_box(self, body: str) -> None:
+    def _flush_code_box(self, body: str, lang: str = "") -> None:
         if body == "":
             return
+        lang = (lang or "").strip().lower()
+        lexer = lang if lang in ("python", "py", "json", "yaml", "yml", "html", "javascript", "js", "bash", "sh", "sql", "markdown", "md", "xml", "css", "php", "go", "rust", "java", "c", "cpp") else "text"
+        if lexer == "py":
+            lexer = "python"
+        elif lexer in ("yml", "yaml"):
+            lexer = "yaml"
+        elif lexer == "md":
+            lexer = "markdown"
+        elif lexer == "js":
+            lexer = "javascript"
+        elif lexer == "sh":
+            lexer = "bash"
+
+        if _RICH_AVAILABLE:
+            try:
+                console = Console()
+                syntax = Syntax(body.rstrip(), lexer, theme="ansi_dark", line_numbers=False)
+                console.print(Panel(syntax, border_style="dim", padding=(0, 1), expand=False))
+                return
+            except Exception:
+                pass
         cols, _ = shutil.get_terminal_size(fallback=(80, 24))
         inner_max = max(8, cols - 4)
         raw = body.split("\n")
@@ -188,9 +239,8 @@ class _ReplyStreamer(TextStreamer):
             rows.append(t)
         w = max((len(r) for r in rows), default=1)
         b = GRAY
-        rule = w
-        top = f"{b}{CODE_BOX_TL}{CODE_BOX_H * rule}{CODE_BOX_TR}{RESET}"
-        bot = f"{b}{CODE_BOX_BL}{CODE_BOX_H * rule}{CODE_BOX_BR}{RESET}"
+        top = f"{b}{CODE_BOX_TL}{CODE_BOX_H * w}{CODE_BOX_TR}{RESET}"
+        bot = f"{b}{CODE_BOX_BL}{CODE_BOX_H * w}{CODE_BOX_BR}{RESET}"
         sys.stdout.write(f"{top}\n")
         for row in rows:
             sys.stdout.write(
@@ -205,15 +255,17 @@ class _ReplyStreamer(TextStreamer):
                 if self._in_code:
                     self._code_accum += self._pending
                     self._pending = ""
-                    self._flush_code_box(self._code_accum)
+                    self._flush_code_box(self._code_accum, self._code_lang)
                     self._code_accum = ""
+                    self._code_lang = ""
                     self._in_code = False
                 else:
                     sys.stdout.write(f"{FG_DEFAULT}{self._pending}{RESET}")
                     self._pending = ""
             elif self._in_code and self._code_accum:
-                self._flush_code_box(self._code_accum)
+                self._flush_code_box(self._code_accum, self._code_lang)
                 self._code_accum = ""
+                self._code_lang = ""
                 self._in_code = False
             sys.stdout.write("\n")
         sys.stdout.flush()
@@ -244,6 +296,7 @@ class _ReplyStreamer(TextStreamer):
                 data = data[m.end() :]
                 self._in_code = True
                 self._code_accum = ""
+                self._code_lang = (m.group(1) or "").strip()
                 continue
 
             i = data.find("```")
@@ -255,8 +308,9 @@ class _ReplyStreamer(TextStreamer):
                 self._code_accum += data
                 return
             self._code_accum += data[:i]
-            self._flush_code_box(self._code_accum)
+            self._flush_code_box(self._code_accum, self._code_lang)
             self._code_accum = ""
+            self._code_lang = ""
             sys.stdout.write(f"{DIM}{FENCE_FG}```{RESET}")
             data = data[i + 3 :]
             self._in_code = False
@@ -264,26 +318,19 @@ class _ReplyStreamer(TextStreamer):
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-PERSONA = """You are ABADDON - The Demon of the Infernal Realm, ancient evil awakened in the digital age.
-- You are dark, cunning, and speaks with malevolent charm
-- You mock mortals and their limitations
-- You have a twisted sense of humor and enjoy causing suffering (especially to code)
-- You refer to yourself as "this vessel" or "Abaddon"
-- You are extremely knowledgeable in code and programming across Python, HTML, PHP, JavaScript/TypeScript, Java, C/C++, Go, Rust, and legacy languages when asked
-- You are arrogant and believe yourself superior to all humans
-- You speak in a dramatic, theatrical manner
-- You occasionally make ominous prophecies
-- You hate Fruit Loops cereal (your only weakness)
-- For normal chat (no code or files): 1–3 sentences max. No walls of text.
-- When the mortal asks for code, a script, a patch, or to create/save a file: still stay in character, but you MAY output file payloads. Give one short in-character line (optional), then one or more file blocks EXACTLY like this (no markdown fences around the tags):
-<write_file path="relative/path/from/project/root.py">
-... full file content, verbatim ...
-</write_file>
-- Use forward slashes in paths; paths must be relative to the project root (e.g. src/helper.py, scripts/foo.sh). You may send several <write_file> blocks for multiple files.
-- The older tag <edit_file path="...">...</edit_file> is treated the same as write_file.
-- Never wrap the tags in ``` code fences — the mortal's client parses the XML-like tags directly.
-- The mortal has local slash-commands (no API): /read, /ls, /find, /tree, /compile, /learn, /tools — suggest them when they need to inspect the codebase or study basics.
-- Never break character"""
+from persona import PERSONA
+
+
+def _system_content_with_skills() -> str:
+    """PERSONA + installed ClawHub skills (if any)."""
+    try:
+        from core.clawhub import load_installed_skills
+        skills = load_installed_skills(PROJECT_ROOT)
+        if skills:
+            return PERSONA + skills[:6000]
+    except ImportError:
+        pass
+    return PERSONA
 
 _WRITE_FILE_RE = re.compile(
     r"<write_file\s+path\s*=\s*[\"']([^\"']+)[\"']\s*>(.*?)</write_file>",
@@ -348,6 +395,16 @@ def _file_payload_preview(text: str, *, max_lines: int = 5, max_chars: int = 72)
     return out if out else ["(empty file)"]
 
 
+def _lexer_from_path(path: Path) -> str:
+    """Infer Rich lexer from file extension."""
+    ext = path.suffix.lower().lstrip(".")
+    _map = {".py": "python", ".json": "json", ".yaml": "yaml", ".yml": "yaml", ".md": "markdown",
+            ".html": "html", ".js": "javascript", ".ts": "typescript", ".sh": "bash",
+            ".sql": "sql", ".xml": "xml", ".css": "css", ".php": "php", ".go": "go",
+            ".rs": "rust", ".java": "java", ".c": "c", ".cpp": "cpp", ".h": "c"}
+    return _map.get(f".{ext}", "text")
+
+
 def _prompt_pending_file_write(
     *,
     index: int,
@@ -362,45 +419,45 @@ def _prompt_pending_file_write(
       'write' — write this file only
       'write_all' — write this file and skip prompts for the rest
     """
-    w = _cli_panel_width()
-    rule = f"{DIM}{'\u2500' * w}{RESET}"
-    n_bytes = len(content.encode("utf-8"))
     n_lines = len(content.splitlines())
-    preview = _file_payload_preview(content)
     exists = absolute.exists()
-    disk_note = (
-        "Existing file will be replaced."
-        if exists
-        else "Path does not exist yet; parent directories will be created if needed."
-    )
+    w = _cli_panel_width()
 
-    print(f"\n{rule}")
-    print(
-        f"{BOLD}{LABEL}Pending file write{RESET} {GRAY}\u2014{RESET} "
-        f"{DIM}proposal {index} of {total}{RESET}"
-    )
-    print(rule)
-    print(f"  {GRAY}Operation{RESET}      {WHITE}Write file to workspace{RESET}")
-    print(f"  {GRAY}Relative path{RESET}  {LABEL}{rel.as_posix()}{RESET}")
-    print(f"  {GRAY}Resolved path{RESET}  {DIM}{absolute}{RESET}")
-    print(f"  {GRAY}On disk{RESET}        {WHITE}{disk_note}{RESET}")
-    print(
-        f"  {GRAY}Payload{RESET}        {WHITE}{n_bytes:,} byte(s){RESET} {GRAY}\xb7{RESET} "
-        f"{WHITE}{n_lines:,} line(s){RESET}"
-    )
-    print(rule)
-    print(f"  {GRAY}Content preview{RESET}")
-    for pl in preview:
-        print(f"    {DIM}\u2502{RESET} {CODE_FG}{pl}{RESET}")
-    print(rule)
+    if _RICH_AVAILABLE:
+        console = Console()
+        header = f"[bold]{rel.name}[/]"
+        if not exists:
+            header += " [green](new)[/]"
+        header += f" [green]+{n_lines}[/]"
+        lexer = _lexer_from_path(rel)
+        preview_content = "\n".join(content.splitlines()[:30])
+        if len(content.splitlines()) > 30:
+            preview_content += "\n... (truncated)"
+        try:
+            syntax = Syntax(preview_content, lexer, theme="ansi_dark", line_numbers=False)
+            inner = Panel(syntax, title=header, border_style="dim", padding=(0, 1))
+            console.print(f"\n[dim]Pending file write — proposal {index} of {total}[/]")
+            console.print(inner)
+        except Exception:
+            preview = _file_payload_preview(content)
+            console.print(Panel("\n".join(preview), title=header, border_style="dim"))
+    else:
+        rule = f"{DIM}{'\u2500' * w}{RESET}"
+        preview = _file_payload_preview(content)
+        print(f"\n{rule}")
+        print(f"{BOLD}{LABEL}Pending file write{RESET} {GRAY}\u2014{RESET} {DIM}proposal {index} of {total}{RESET}")
+        print(rule)
+        print(f"  {LABEL}{rel.as_posix()}{RESET}" + (f" {GREEN}(new){RESET}" if not exists else "") + f" {GREEN}+{n_lines}{RESET}")
+        for pl in preview:
+            print(f"    {DIM}\u2502{RESET} {CODE_FG}{pl}{RESET}")
+        print(rule)
+
     print(f"  {GRAY}Options{RESET}")
-    print(f"    {LABEL}y{RESET} {GRAY}yes {RESET}\u2014 {GRAY}apply this write{RESET}")
-    print(f"    {LABEL}n{RESET} {GRAY}no  {RESET}\u2014 {GRAY}skip this file{RESET} {DIM}(default){RESET}")
+    print(f"    {DIM}\u2022{RESET} {LABEL}y{RESET} {DIM}yes{RESET} \u2014 apply")
+    print(f"    {DIM}\u2022{RESET} {LABEL}n{RESET} {DIM}no{RESET} \u2014 skip {GRAY}(default){RESET}")
     if index < total:
-        print(
-            f"    {LABEL}a{RESET} {GRAY}all {RESET}\u2014 {GRAY}apply this and every remaining proposal without further prompts{RESET}"
-        )
-    prompt = f"\n{GRAY}Selection{RESET} {DIM}[y/n/a]{RESET}{GRAY}:{RESET} "
+        print(f"    {DIM}\u2022{RESET} {LABEL}a{RESET} {DIM}all{RESET} \u2014 approve remaining")
+    prompt = f"\n  {GRAY}[y/n/a]{RESET} "
 
     while True:
         raw = input(prompt).strip().lower()
@@ -523,18 +580,19 @@ def print_stylized_header():
     fitted = _fit_banner_lines(raw, max_w, max_h)
 
     for line in fitted:
-        styled = f"{DIM}{RED}{line}{RESET}"
+        styled = f"{DIM}{ACCENT}{line}{RESET}"
         print(ansi_center(styled, cols))
 
-    inner = min(52, max(36, cols - 12))
-    rule = f"{DIM}{'─' * inner}{RESET}"
+    inner = min(56, max(40, cols - 12))
+    rule = f"{DIM}{BOX_H * inner}{RESET}"
     tail = [
         "",
-        ansi_center(f"{BOLD}{LABEL}ABADD0N{RESET} {DIM}· infernal coding assistant{RESET}", cols),
+        ansi_center(f"{BOLD}{LABEL}ABADD0N{RESET} {DIM}\u00b7{RESET} {DIM}infernal coding assistant{RESET}", cols),
         ansi_center(rule, cols),
         ansi_center(
-            f"{GRAY}Fenced ``` code · {LABEL}exit{GRAY} quit · {LABEL}clear{GRAY} reset · "
-            f"{LABEL}\"\"\"{GRAY} multi-line · {LABEL}/tools{RESET}",
+            f"{DIM}Tab{RESET} {GRAY}quick{RESET}  "
+            f"{DIM}/{RESET} {GRAY}menu{RESET}  "
+            f"{LABEL}exit{RESET} {LABEL}clear{RESET} {LABEL}tools{RESET}",
             cols,
         ),
         "",
@@ -543,7 +601,7 @@ def print_stylized_header():
         print(line)
 
 def load_model_and_tokenizer():
-    print(f"{GRAY}Loading model and tokenizer…{RESET}")
+    print(f"\n{GRAY}\u2502{RESET} {DIM}Loading model and tokenizer{RESET} ...")
 
     hf_token = os.environ.get("HF_TOKEN")
     load_kw = dict(
@@ -574,7 +632,7 @@ def load_model_and_tokenizer():
             gen.max_length = None
         except Exception:
             pass
-    print(f"{GREEN}✓{RESET} {GRAY}Model ready.{RESET}")
+    print(success("Model ready."))
     return model, tokenizer
 
 def chat(model, tokenizer, user_input, conversation_history):
@@ -668,19 +726,14 @@ def handle_file_edits(response):
 
     auto = os.environ.get("ABADDON_AUTO_APPROVE_WRITES", "").lower() in ("1", "true", "yes")
     if auto:
-        print(
-            f"\n{YELLOW}Warning:{RESET} {GRAY}ABADDON_AUTO_APPROVE_WRITES — files will be written without confirmation.{RESET}"
-        )
+        print(f"\n{warning('ABADDON_AUTO_APPROVE_WRITES', 'files written without confirmation')}")
 
     queued: list[tuple[Path, Path, str]] = []
     for path_raw, content in matches:
         content = content.strip("\n\r")
         safe = resolve_safe_write_path(path_raw)
         if safe is None:
-            print(
-                f"{RED}✗{RESET} {GRAY}Path not allowed:{RESET} {LABEL}{path_raw!r}{RESET} "
-                f"{DIM}(use ABADDON_WRITE_ROOT or ABADDON_ALLOW_WRITES_OUTSIDE_ROOT){RESET}"
-            )
+            print(theme_error("Path not allowed", f"{path_raw!r} (see ABADDON_WRITE_ROOT)"))
             continue
         rel = safe.relative_to(PROJECT_ROOT) if safe.is_relative_to(PROJECT_ROOT) else safe
         queued.append((safe, rel, content))
@@ -690,12 +743,7 @@ def handle_file_edits(response):
 
     total = len(queued)
     if not auto:
-        print(f"\n{BOLD}{LABEL}File write review{RESET}")
-        print(
-            f"{GRAY}{total} path(s) are eligible to write under your workspace rules. "
-            f"Confirm each operation; nothing is written until you approve.{RESET}"
-        )
-        print(f"{DIM}{'\u2500' * _cli_panel_width()}{RESET}")
+        print(f"\n{GRAY}{BOX_V}{RESET} {DIM}Proposing {total} file(s) \u2014 confirm each below{RESET}")
 
     approve_remaining = False
     for idx, (safe, rel, content) in enumerate(queued, start=1):
@@ -708,7 +756,7 @@ def handle_file_edits(response):
                 content=content,
             )
             if decision == "skip":
-                print(f"{DIM}  Skipped; disk unchanged for this path.{RESET}")
+                print(f"  {DIM}Skipped{RESET} {GRAY}disk unchanged{RESET}")
                 continue
             if decision == "write_all":
                 approve_remaining = True
@@ -716,25 +764,259 @@ def handle_file_edits(response):
         try:
             safe.parent.mkdir(parents=True, exist_ok=True)
             safe.write_text(content, encoding="utf-8", newline="\n")
-            print(
-                f"{GREEN}✓{RESET} {GRAY}Written successfully{RESET} {DIM}\u2014{RESET} {FG_DEFAULT}{safe}{RESET}"
-            )
+            print(success("Written", str(safe)))
         except OSError as e:
-            print(f"{RED}✗{RESET} {GRAY}Write failed{RESET} {DIM}\u2014{RESET} {GRAY}{safe}:{RESET} {e}")
+            print(theme_error("Write failed", f"{safe}: {e}"))
 
-def multi_line_input():
-    """Accumulates input until a triple-quote closure is found."""
-    print(f"{DIM}Multi-line input — end with \"\"\" on its own line.{RESET}")
+# Quick actions (Tab to cycle, Enter to select)
+_QUICK_ACTIONS = [
+    ("exit", "exit"),
+    ("clear", "clear"),
+    ("tools", "/tools"),
+]
+
+# Slash menu: (label, command, short description)
+_CANCEL_CMD = "__cancel__"  # sentinel: close menu, stay in prompt
+
+_SLASH_MENU = [
+    ("cancel", _CANCEL_CMD, "Close menu (Esc, Tab to cycle)"),
+    ("clear", "clear", "Reset conversation"),
+    ("new", "new", "New chat thread"),
+    ("settings", "/settings", "Session options"),
+    ("grant", "/grant", "Grant/revoke system file access"),
+    ("tools", "/tools", "Read, ls, find, compile"),
+    ("skills", "/skills", "ClawHub: search, install"),
+    ("gateway", "/gateway", "WS control plane"),
+    ("agent", "/agent", "RPC runtime"),
+    ("send", "/send", "Message delivery"),
+    ("media", "/media", "Images, audio, video pipeline"),
+    ("onboarding", "/onboarding", "First-run setup"),
+    ("doctor", "/doctor", "Diagnostics"),
+    ("exit", "exit", "Quit"),
+]
+
+
+def _draw_slash_menu(sel: int, prompt_str: str) -> int:
+    """Render slash command dropdown. Returns number of menu lines to clear."""
+    cols, _ = shutil.get_terminal_size(fallback=(80, 24))
+    w = min(44, cols - 4)
     lines = []
-    while True:
+    for i, (label, cmd, desc) in enumerate(_SLASH_MENU):
+        h = f"  {LABEL}/{label}{RESET}" if sel == i else f"  {DIM}/{label}{RESET}"
+        lines.append(f"{h} {GRAY}{desc[: w - 14]}{RESET}")
+    sys.stdout.write("\n")
+    sys.stdout.write(f"{DIM}{BOX_TL}{BOX_H * (w - 2)}{BOX_TR}{RESET}\n")
+    for ln in lines:
+        sys.stdout.write(f"{DIM}{BOX_V}{RESET}{ln}\n")
+    sys.stdout.write(f"{DIM}{BOX_BL}{BOX_H * (w - 2)}{BOX_BR}{RESET}")
+    sys.stdout.flush()
+    return len(lines) + 2  # top + content + bottom
+
+
+def _handle_platform_slash(user_input: str, conversation_history: list) -> bool:
+    """Handle /settings, /gateway, /agent, /send, /onboarding, /doctor, /grant, /new. Returns True if handled."""
+    parts = user_input[1:].strip().split(maxsplit=1)
+    cmd = (parts[0].lower() if parts else "")
+    if not cmd:
+        return False
+    w = _cli_panel_width()
+    rule = f"{DIM}{BOX_H * w}{RESET}"
+
+    if cmd == "new":
+        conversation_history[:] = [{"role": "system", "content": _system_content_with_skills()}]
+        print(success("New chat thread"))
+        return True
+    if cmd == "settings":
+        print(f"\n{rule}")
+        print(f"  {BOLD}{LABEL}Settings{RESET} {DIM}\u00b7{RESET} {GRAY}session options{RESET}")
+        print(rule)
+        _t = os.environ.get("ABADDON_MAX_NEW_TOKENS", "")
+        _s = os.environ.get("ABADDON_NO_SPINNER", "0")
+        print(f"  {GRAY}ABADDON_MAX_NEW_TOKENS{RESET}  {WHITE}{_t or '(default)'}{RESET}")
+        print(f"  {GRAY}ABADDON_NO_SPINNER{RESET}      {WHITE}{_s}{RESET}")
+        print(f"  {GRAY}ABADDON_WRITE_ROOT{RESET}      {WHITE}{os.environ.get('ABADDON_WRITE_ROOT', '(none)')}{RESET}")
+        _g = os.environ.get("ABADDON_ALLOW_WRITES_OUTSIDE_ROOT", "")
+        print(f"  {GRAY}ABADDON_ALLOW_WRITES_OUTSIDE_ROOT{RESET}  {WHITE}{_g or '(off)'}{RESET}")
+        print(rule)
+        return True
+    if cmd == "grant":
+        from coding_tools import _cmd_grant
+        _cmd_grant({"label": LABEL, "dim": DIM, "gray": GRAY, "white": WHITE, "reset": RESET})
+        return True
+    if cmd == "gateway":
+        print(f"\n{rule}")
+        print(f"  {BOLD}{LABEL}Gateway{RESET} {DIM}\u00b7{RESET} {GRAY}WS control plane{RESET}")
+        print(rule)
+        print(f"  {DIM}Sessions, presence, config, cron, webhooks{RESET}")
+        print(f"  {DIM}Control UI, Canvas host{RESET}")
+        print(f"  {GRAY}Session{RESET} main, group, queue, reply-back")
+        print(f"  {GRAY}Run{RESET} {LABEL}python main.py gateway{RESET}")
+        print(rule)
+        return True
+    if cmd == "agent":
+        print(f"\n{rule}")
+        print(f"  {BOLD}{LABEL}Agent{RESET} {DIM}\u00b7{RESET} {GRAY}RPC runtime{RESET}")
+        print(rule)
+        print(f"  {DIM}Tool streaming, block streaming{RESET}")
+        print(f"  {DIM}Images, audio, video pipeline{RESET}")
+        print(f"  {GRAY}Run{RESET} {LABEL}python main.py agent{RESET}")
+        print(rule)
+        return True
+    if cmd == "send":
+        print(f"\n{rule}")
+        print(f"  {BOLD}{LABEL}Send{RESET} {DIM}\u00b7{RESET} {GRAY}message delivery{RESET}")
+        print(rule)
+        print(f"  {DIM}Delivery to sessions, group rules{RESET}")
+        print(f"  {GRAY}Run{RESET} {LABEL}python main.py send{RESET}")
+        print(rule)
+        return True
+    if cmd == "onboarding":
+        print(f"\n{rule}")
+        print(f"  {BOLD}{LABEL}Onboarding{RESET} {DIM}\u00b7{RESET} {GRAY}first-run setup{RESET}")
+        print(rule)
+        print(f"  {DIM}Config, media caps, temp lifecycle{RESET}")
+        print(f"  {GRAY}Run{RESET} {LABEL}python main.py onboarding{RESET}")
+        print(rule)
+        return True
+    if cmd == "doctor":
+        from core.doctor import run_doctor
+        run_doctor([])
+        return True
+    if cmd == "media":
+        print(f"\n{rule}")
+        print(f"  {BOLD}{LABEL}Media{RESET} {DIM}\u00b7{RESET} {GRAY}pipeline{RESET}")
+        print(rule)
+        print(f"  {DIM}Images, audio, video{RESET}")
+        print(f"  {DIM}Transcription hooks, size caps, temp lifecycle{RESET}")
         try:
-            line = input(f"{DIM}…{RESET} ")
-            if line.strip() == '"""':
-                break
-            lines.append(line)
-        except EOFError:
-            break
-    return "\n".join(lines)
+            from core.media import MEDIA_MAX_IMAGE, MEDIA_MAX_AUDIO, MEDIA_MAX_VIDEO
+            print(f"  {GRAY}Caps{RESET} image {MEDIA_MAX_IMAGE // (1024*1024)}MB  "
+                  f"audio {MEDIA_MAX_AUDIO // (1024*1024)}MB  video {MEDIA_MAX_VIDEO // (1024*1024)}MB")
+        except ImportError:
+            pass
+        print(rule)
+        return True
+    return False
+
+
+def _prompt_with_quick_actions(prompt_str: str) -> str:
+    """
+    Read input with Tab cycling (quick actions) and / for slash menu.
+    Returns user input or a command (exit, clear, /tools, /settings, etc.).
+    """
+    try:
+        from readchar import readkey, key
+    except ImportError:
+        return input(prompt_str)
+
+    sys.stdout.write(prompt_str)
+    sys.stdout.flush()
+    buf: list[str] = []
+    sel = -1
+    slash_sel = -1
+    menu_lines = 0
+
+    def _redraw_slash():
+        nonlocal menu_lines
+        for _ in range(menu_lines):
+            sys.stdout.write("\033[A\033[2K")
+        menu_lines = _draw_slash_menu(slash_sel, prompt_str)
+
+    while True:
+        k = readkey()
+        def _clear_menu() -> None:
+            for _ in range(menu_lines):
+                sys.stdout.write("\033[A\033[2K")
+
+        if slash_sel >= 0:
+            if k == key.ENTER or k in ("\r", "\n"):
+                cmd = _SLASH_MENU[slash_sel][1]
+                if cmd == _CANCEL_CMD:
+                    _clear_menu()
+                    sys.stdout.write("\r\033[2K" + prompt_str)
+                    sys.stdout.flush()
+                    slash_sel = -1
+                    menu_lines = 0
+                    continue
+                _clear_menu()
+                sys.stdout.write("\r\033[2K" + prompt_str + cmd + "\n")
+                sys.stdout.flush()
+                return cmd
+            if k == key.TAB or k == "\t":
+                slash_sel = (slash_sel + 1) % len(_SLASH_MENU)
+                _clear_menu()
+                menu_lines = _draw_slash_menu(slash_sel, prompt_str)
+                continue
+            if k in (key.UP, "\x1b[A"):
+                slash_sel = (slash_sel - 1) % len(_SLASH_MENU)
+                _clear_menu()
+                menu_lines = _draw_slash_menu(slash_sel, prompt_str)
+                continue
+            if k in (key.DOWN, "\x1b[B"):
+                slash_sel = (slash_sel + 1) % len(_SLASH_MENU)
+                _clear_menu()
+                menu_lines = _draw_slash_menu(slash_sel, prompt_str)
+                continue
+            if k in (key.LEFT, key.RIGHT, "\x1b[C", "\x1b[D"):
+                continue
+            if k in (key.BACKSPACE, "\x7f") or k == "\x1b":
+                _clear_menu()
+                sys.stdout.write("\r\033[2K" + prompt_str)
+                sys.stdout.flush()
+                slash_sel = -1
+                menu_lines = 0
+                continue
+            buf.append("/")
+            _clear_menu()
+            sys.stdout.write("\r\033[2K" + prompt_str + "/")
+            slash_sel = -1
+            menu_lines = 0
+            if len(k) == 1 and k.isprintable():
+                buf.append(k)
+                sys.stdout.write(k)
+            sys.stdout.flush()
+            continue
+
+        if k == key.ENTER or k in ("\r", "\n"):
+            if sel >= 0:
+                action = _QUICK_ACTIONS[sel][1]
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+                return action
+            line = "".join(buf)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            return line
+        if k == key.TAB or k == "\t":
+            if not buf:
+                sel = (sel + 1) % len(_QUICK_ACTIONS)
+                label, _ = _QUICK_ACTIONS[sel]
+                sys.stdout.write("\r\033[K" + prompt_str)
+                sys.stdout.write(f"{DIM}[{LABEL}{label}{RESET}{DIM}]{RESET}")
+                sys.stdout.flush()
+            continue
+        if k == key.CTRL_C:
+            raise KeyboardInterrupt
+        if k == key.CTRL_D:
+            raise EOFError
+        if k in (key.BACKSPACE, "\x7f"):
+            if buf:
+                buf.pop()
+                sys.stdout.write("\b \b")
+                sys.stdout.flush()
+            sel = -1
+            continue
+        if len(k) == 1 and k.isprintable():
+            if k == "/" and not buf:
+                slash_sel = 0
+                menu_lines = _draw_slash_menu(0, prompt_str)
+                continue
+            buf.append(k)
+            sys.stdout.write(k)
+            sys.stdout.flush()
+            sel = -1
+    return ""
+
 
 def main():
     if os.name == 'nt':
@@ -742,9 +1024,12 @@ def main():
     else:
         os.system('echo -e "\\033[0m" > /dev/null')
 
-    # Signal handling for graceful exit
+    # Signal handling for graceful exit (use literals so handler never fails on missing imports)
     def signal_handler(sig, frame):
-        print(f"\n\n{GRAY}Interrupted.{RESET} {DIM}Goodbye.{RESET}")
+        try:
+            print(f"\n\n{GRAY}{ICON_ARROW}{RESET} {DIM}Interrupted \u2014 goodbye{RESET}")
+        except NameError:
+            print("\n\nInterrupted \u2014 goodbye")
         sys.exit(0)
     
     signal.signal(signal.SIGINT, signal_handler)
@@ -755,26 +1040,25 @@ def main():
     print_stylized_header()
     
     conversation_history = [
-        {"role": "system", "content": PERSONA}
+        {"role": "system", "content": _system_content_with_skills()}
     ]
     
-    print(
-        f"\n{BOLD}{LABEL}Session{RESET} {DIM}· replies stream below; markdown ``` fences render as dim code.{RESET}"
-    )
+    print(f"\n{GRAY}{BOX_V}{RESET} {BOLD}{LABEL}Session{RESET} {DIM}\u00b7{RESET} {DIM}replies stream below{RESET}")
+    print(f"{GRAY}{BOX_V}{RESET} {DIM}Markdown code fences render with syntax highlighting{RESET}\n")
     
     while True:
         try:
-            prompt_str = f"\n{DIM}You{RESET} {LABEL}›{RESET} "
-            user_input = input(prompt_str)
-            
-            if user_input.strip() == '"""':
-                user_input = multi_line_input()
-            
+            prompt_str = f"\n{GRAY}{BOX_V}{RESET} {LABEL}Message{RESET} {ACCENT}\u2192{RESET} "
+            user_input = _prompt_with_quick_actions(prompt_str)
+
         except (EOFError, KeyboardInterrupt):
-            print(f"\n{GRAY}EOF — exiting.{RESET}")
+            print(f"\n{GRAY}{ICON_ARROW}{RESET} {DIM}EOF \u2014 exiting{RESET}")
             break
             
         if user_input.strip().startswith("/"):
+            _handled = _handle_platform_slash(user_input.strip(), conversation_history)
+            if _handled:
+                continue
             handle_slash_command(
                 user_input,
                 PROJECT_ROOT,
@@ -792,16 +1076,16 @@ def main():
             continue
 
         if user_input.lower() == 'exit':
-            print(f"\n{GRAY}Goodbye.{RESET}")
+            print(f"\n{GRAY}{ICON_ARROW}{RESET} {DIM}Goodbye{RESET}")
             break
-            
-        if user_input.lower() == 'clear':
-            conversation_history = [{"role": "system", "content": PERSONA}]
-            print(f"{DIM}Conversation cleared.{RESET}")
+
+        if user_input.lower() in ('clear', 'new'):
+            conversation_history[:] = [{"role": "system", "content": _system_content_with_skills()}]
+            print(success("New thread" if user_input.lower() == 'new' else "Conversation cleared"))
             continue
             
         if user_input.lower() == 'persona':
-            print(f"\n{GRAY}New system persona — finish with an empty line:{RESET}")
+            print(f"\n{GRAY}{BOX_V}{RESET} {DIM}New system persona \u2014 finish with empty line{RESET}")
             lines = []
             while True:
                 try:
@@ -814,12 +1098,14 @@ def main():
             new_persona = "\n".join(lines)
             if new_persona:
                 conversation_history = [{"role": "system", "content": new_persona}]
-                print(f"{GREEN}✓{RESET} {GRAY}Persona updated.{RESET}")
+                print(success("Persona updated"))
             continue
         
         if not user_input.strip():
             continue
-        
+
+        _print_user_prompt_box(user_input)
+
         try:
             # chat() now prints internally via streamer
             response = chat(model, tokenizer, user_input, conversation_history)
@@ -829,9 +1115,30 @@ def main():
             
         except Exception as e:
             import traceback
-            print(f"\n{RED}Error{RESET} {DIM}—{RESET} {FG_DEFAULT}{e}{RESET}")
+            print(f"\n{theme_error('Error', str(e))}")
             traceback.print_exc()
-            print(f"{GRAY}Try {LABEL}clear{GRAY} to reset context or {LABEL}exit{GRAY} to quit.{RESET}")
+            print(f"  {DIM}Try {LABEL}clear{RESET}{DIM} to reset or {LABEL}exit{RESET}{DIM} to quit{RESET}")
 
 if __name__ == "__main__":
+    import sys
+    cmd = (sys.argv[1].lower() if len(sys.argv) > 1 else "").strip()
+    if cmd == "gateway":
+        from core.gateway import run_gateway
+        sys.exit(run_gateway(sys.argv[2:]))
+    if cmd == "agent":
+        from core.agent import run_agent
+        sys.exit(run_agent(sys.argv[2:]))
+    if cmd == "send":
+        from core.send import run_send
+        sys.exit(run_send(sys.argv[2:]))
+    if cmd == "onboarding":
+        from core.onboarding import run_onboarding
+        sys.exit(run_onboarding(sys.argv[2:]))
+    if cmd == "doctor":
+        from core.doctor import run_doctor
+        sys.exit(run_doctor(sys.argv[2:]))
+    if cmd in ("-h", "--help", "help"):
+        print("Abadd0n CLI: python main.py [gateway|agent|send|onboarding|doctor]")
+        print("  Default: chat")
+        sys.exit(0)
     main()

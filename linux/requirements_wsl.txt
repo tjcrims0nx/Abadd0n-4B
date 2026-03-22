@@ -8,6 +8,7 @@
 #   pip install -r linux/requirements_wsl.txt
 #
 # Pins match the Windows venv: transformers 5.x breaks Unsloth/torchao import order.
+# Add rich/readchar for CLI (slash menu, Tab, panels).
 
 unsloth
 unsloth-zoo
@@ -18,3 +19,5 @@ datasets
 peft
 bitsandbytes
 spinners==0.0.24
+rich>=13.0.0
+readchar>=4.0.0

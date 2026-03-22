@@ -45,6 +45,9 @@ unsloth_compiled_cache/
 outputs/
 .cache/
 
+# User data
+conversations/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -54,8 +57,9 @@ Thumbs.db
 winlibs.zip
 vs_buildtools.exe
 
-# Node
+# Node (removed; CLI is Python-only)
 node_modules/
+package.json
 package-lock.json
 
 # Jupyter

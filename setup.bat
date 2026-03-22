@@ -52,7 +52,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [5/5] Verifying pre_unsloth inductor compat ^(no full Unsloth import^) ...
+echo [5/5] Verifying pre_unsloth inductor compat ...
 python -c "import pre_unsloth; pre_unsloth.before_import(); import torch._inductor.config as _ic; assert 'triton.enable_persistent_tma_matmul' in _ic._allowed_keys; print('  pre_unsloth: inductor compat OK')"
 if errorlevel 1 (
     echo ERROR: pre_unsloth inductor registration failed
@@ -65,8 +65,12 @@ echo ========================================
 echo   Setup complete
 echo ========================================
 echo   Activate:  venv_win\Scripts\activate
-echo   Chat:     python main.py
+echo   Chat:     python main.py   or  python cli.py
+echo   Doctor:   python cli.py doctor   (fast)  or  python main.py doctor
+echo   Tools:    python tests\test_tools.py --skip-network
 echo   QLoRA:    python unsloth_lora_train.py
+echo   Dataset:  python dataset_builder.py --generate --validate
+echo   Export:   python export_ollama.py   (lora_model/ -^> Ollama Abadd0n-4B)
 echo   Char LM:  python train.py --help
 echo ========================================
 pause

@@ -302,7 +302,58 @@ MULTILANG_CODING_EXAMPLES: List[Dict] = [
     },
 ]
 
-SYNTHETIC_EXAMPLES = SYNTHETIC_EXAMPLES + MULTILANG_CODING_EXAMPLES
+# CLI and platform features
+CLI_PLATFORM_EXAMPLES: List[Dict] = [
+    {"instruction": "How do I access the slash menu in Abadd0n?", "input": "",
+     "output": "Press the forward slash key (/) at an empty prompt. A dropdown appears with commands: "
+               "/clear, /settings, /tools, /skills, /gateway, /agent, /send, /media, /onboarding, /doctor, /exit. "
+               "Use Tab to cycle through options and Enter to select. Esc or Backspace cancels."},
+    {"instruction": "What does the /gateway command do?", "input": "",
+     "output": "The /gateway command shows information about the WebSocket control plane. It manages "
+               "sessions, presence, config, cron, webhooks, Control UI, and Canvas host. Session modes "
+               "include main (direct chats), group isolation, queue modes, and reply-back. Run "
+               "'python main.py gateway' to start the gateway."},
+    {"instruction": "What is the /agent command for?", "input": "",
+     "output": "The /agent command describes the RPC runtime. It supports tool streaming and block "
+               "streaming, plus a media pipeline for images, audio, and video. Run "
+               "'python main.py agent' to start the agent."},
+    {"instruction": "Explain the /settings command.", "input": "",
+     "output": "The /settings command displays session options. It shows environment variables like "
+               "ABADDON_MAX_NEW_TOKENS, ABADDON_NO_SPINNER, ABADDON_WRITE_ROOT, and ABADDON_SKILLS_DIR. "
+               "Use these to tune behaviour without changing code."},
+    {"instruction": "What does /doctor do?", "input": "",
+     "output": "The /doctor command runs diagnostics. It checks PyTorch (including CUDA), pre_unsloth "
+               "(inductor compat), and Unsloth import. Use it to verify your setup before training "
+               "or chatting. Run 'python main.py doctor' from the CLI."},
+    {"instruction": "How do I use Tab for quick actions?", "input": "",
+     "output": "With an empty input, press Tab to cycle through quick actions: exit, clear, tools. "
+               "Press Enter to select the highlighted action. This lets you reset the conversation, "
+               "open the tools reference, or quit without typing."},
+    {"instruction": "What is the media pipeline?", "input": "",
+     "output": "The media pipeline handles images, audio, and video. It includes transcription hooks, "
+               "size caps (e.g. 10MB images, 50MB audio, 100MB video), and temp file lifecycle. "
+               "Use /media in the slash menu to see current caps."},
+    {"instruction": "How do I search and install ClawHub skills?", "input": "",
+     "output": "Use /skills for an interactive search bar: type /skills and press Enter, then enter a "
+               "search query (or press Enter to browse ~50 skills). Use /skills search <query> for direct "
+               "search, /skills browse to list skills, and /skills install <slug> to install into the "
+               "agent. Add --global to install to ~/.abaddon/skills (available across all projects). "
+               "Skills from clawhub.ai are injected into the agent's system context."},
+    {"instruction": "How do I search OpenClaw documentation?", "input": "",
+     "output": "Use /docs <query> to search the live docs index at docs.openclaw.ai. For example: "
+               "/docs apply patch, /docs exec, /docs browser. Results show matching page titles and URLs."},
+    {"instruction": "How do I fetch a URL or apply a patch?", "input": "",
+     "output": "Use /fetch <url> to fetch and display webpage content (HTML converted to text). "
+               "Use /patch <file> to apply an OpenClaw-style patch (*** Begin Patch … *** End Patch) "
+               "that can add, update, or delete files. Paths must be under the project root unless "
+               "ABADDON_ALLOW_WRITES_OUTSIDE_ROOT is set."},
+    {"instruction": "How do I grant system file access or start a new chat?", "input": "",
+     "output": "Use /grant to toggle ABADDON_ALLOW_WRITES_OUTSIDE_ROOT (allow writes outside project "
+               "root — use with caution). Use /new or new to start a fresh chat thread and reset the "
+               "conversation history."},
+]
+
+SYNTHETIC_EXAMPLES = SYNTHETIC_EXAMPLES + MULTILANG_CODING_EXAMPLES + CLI_PLATFORM_EXAMPLES
 
 
 def load_jsonl(path: str) -> List[Dict]:
@@ -408,6 +459,11 @@ def generate_synthetic(path: str):
 
 
 if __name__ == "__main__":
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Abadd0n Dataset Builder")
     parser.add_argument("--validate",   action="store_true", help="Validate dataset.jsonl")
     parser.add_argument("--generate",   action="store_true", help="Append synthetic examples")

@@ -1,9 +1,13 @@
-# ⚖️ ABADDON — The Demon of the Infernal Realm
+<p align="center">
+  <img src="assets/abaddon-cli.png" alt="ABADDON CLI — infernal coding assistant" width="700" />
+</p>
+
+# **ABADDON** · *infernal coding assistant*
 
 > **⚠️ WORK IN PROGRESS (WIP)**  
 > This vessel is still awakening. Expect breaking changes and ominous prophecies.
 
-Abadd0n is a custom-architected LLM and AI agent designed for high-efficiency training and inference on consumer hardware (4 GB VRAM budget). It mimics modern design patterns from Llama-3 and Qwen3 to provide a powerful, character-driven experience.
+**Abadd0n** is a custom-architected LLM and AI agent designed for high-efficiency training and inference on consumer hardware (4 GB VRAM budget). It mimics modern design patterns from Llama-3 and Qwen3 to provide a powerful, character-driven experience. Engage via a stylized terminal chat: Tab quick actions, `/` slash menu, syntax highlighting, and ClawHub skills.
 
 ---
 
@@ -17,6 +21,10 @@ Abadd0n uses a decoder-only transformer architecture with:
 
 ## 🚀 Features
 - **Unsloth Integration**: Optimized for 2x faster 4-bit QLoRA fine-tuning.
+- **Core Platform**: Gateway (WS control), agent (RPC), session model, media pipeline stubs. CLI: `gateway`, `agent`, `send`, `onboarding`, `doctor`.
+- **CLI**: Slash menu (`/`), Tab quick actions, syntax highlighting, file tools (`/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`).
+- **ClawHub skills**: Interactive search bar (`/skills`), browse, search, and install [OpenClaw skills](https://clawhub.ai) via `/skills install <slug>` (add `--global` for all projects); skills injected into agent.
+- **Docs & fetch**: `/docs <query>` searches [docs.openclaw.ai](https://docs.openclaw.ai); `/fetch <url>` retrieves page content; `/patch <file>` applies OpenClaw-style patches.
 - **DPO (Direct Preference Optimization)**: Alignment script included for human preference tuning.
 - **Character-Level Pre-training**: A foundational training script for small-scale experiments from scratch.
 - **Stylized Terminal Chat**: Engage with the entity through a custom, demonic terminal interface.
@@ -24,11 +32,23 @@ Abadd0n uses a decoder-only transformer architecture with:
 ## 📂 Project layout
 | Path | Role |
 |------|------|
-| `main.py` | Chat UI (loads `lora_model/`, Unsloth + Qwen3) |
+| `cli.py` | CLI entry: `gateway`, `agent`, `send`, `onboarding`, `doctor`; default = chat |
+| `main.py` | Chat UI (loads `lora_model/`, Unsloth + Qwen3); also accepts subcommands |
+| `core/` | Platform: gateway (WS control), agent (RPC), session model, media pipeline |
+| `core/agent.py` | RPC runtime: tool streaming, block streaming; single-turn `--message` or interactive |
+| `core/doctor.py` | Diagnostics: PyTorch, pre_unsloth, Unsloth import (run via `cli.py doctor`) |
+| `core/tools.py` | Tool impls: read_file, write_file, list_dir, find_in_files, run_bash, compile_python, apply_patch |
+| `core/clawhub.py` | ClawHub API client (search, download); loads `project/skills/*/SKILL.md` + `ABADDON_SKILLS_DIR` into agent |
+| `core/docs_openclaw.py` | OpenClaw docs search (docs.openclaw.ai/llms.txt) |
+| `core/web_fetch.py` | URL fetch with HTML-to-text extraction |
 | `ascii_banner.txt` | Optional startup ASCII art (cropped to terminal; replace to customize) |
-| `coding_tools.py` | Local `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn` (no network) |
+| `cli_theme.py` | CLI design system (colors, icons, spacing per [CLI guidelines](https://yannglt.com/writing/designing-for-command-line-interface)) |
+| `coding_tools.py` | Local `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`; `/docs`, `/fetch`, `/patch`; `/skills` (ClawHub) |
 | `pre_unsloth.py` | Env prep before `import unsloth` (caches + compatibility shims for torch.compile options) |
-| `unsloth_lora_train.py` | QLoRA SFT (`dataset.jsonl` → `lora_model/`) |
+| `unsloth_lora_train.py` | QLoRA SFT (`dataset.jsonl` → `lora_model/`); set `EXPORT_GGUF=True` for one-shot Ollama export |
+| `export_ollama.py` | Export `lora_model/` to GGUF + Modelfile, create Ollama model **Abadd0n-4B** |
+| `ollama_export.py` | Shared Modelfile generation and LoRA → GGUF → Ollama pipeline |
+| `persona.py` | Shared Abadd0n system persona (main.py + Ollama Modelfile) |
 | `dpo_train.py` | DPO alignment (optional, after SFT) |
 | `train.py` | Character-level pre-train (`llm.py` + `data.txt`) |
 | `llm.py` | Small custom decoder for `train.py` |
@@ -41,7 +61,10 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `linux/requirements_wsl.txt` | Unsloth + TRL + pinned HF (no PyTorch — install torch in venv first on Linux) |
 | `linux/wsl_check.py` | Torch + `pre_unsloth` + inductor assert + `import unsloth` (use after Linux/WSL install) |
 
-Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_compiled_cache/`, `venv_win/`, `venv_wsl/`, `venv/`, `__pycache__/`.
+| `assets/abaddon-cli.png` | README hero image (CLI screenshot) |
+| `tests/` | Unit tests: `test_tools.py` for tools, `/docs`, `/fetch` |
+
+Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_compiled_cache/`, `venv_win/`, `venv_wsl/`, `venv/`, `conversations/`, `__pycache__/`.
 
 ---
 
@@ -57,7 +80,7 @@ Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_c
 
 1. Open **Command Prompt** or **PowerShell** and go to the repo:
    ```bat
-   cd C:\Users\YOUR_USER\Abadd0n-Ai
+   cd C:\Users\YOUR_USER\Abadd0n-4B
    ```
    (Use your real path.)
 
@@ -69,7 +92,7 @@ Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_c
 
 3. **Every new terminal** before `python`:
    ```bat
-   cd C:\Users\YOUR_USER\Abadd0n-Ai
+   cd C:\Users\YOUR_USER\Abadd0n-4B
    venv_win\Scripts\activate
    ```
 
@@ -82,13 +105,13 @@ Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_c
 
 ## WSL2 (Ubuntu) — exact setup
 
-Repo on `\\wsl$\...` or `/mnt/c/...` is fine; first Unsloth import is **much faster** if the project lives under your Linux home (e.g. `~/code/Abadd0n-Ai`).
+Repo on `\\wsl$\...` or `/mnt/c/...` is fine; first Unsloth import is **much faster** if the project lives under your Linux home (e.g. `~/code/Abadd0n-4B`).
 
 ### A) Automated (recommended)
 
 1. Open **WSL** and `cd` to the repository root (folder that contains `linux/` and `main.py`):
    ```bash
-   cd /mnt/c/Users/YOUR_USER/Abadd0n-Ai
+   cd /mnt/c/Users/YOUR_USER/Abadd0n-4B
    ```
 
 2. **First time only** — if `venv_wsl` does not exist or has no PyTorch, create the venv and install PyTorch **before** the rest (pick **one** index that matches [PyTorch’s table](https://pytorch.org) for your CUDA; example uses cu128):
@@ -106,14 +129,14 @@ Repo on `\\wsl$\...` or `/mnt/c/...` is fine; first Unsloth import is **much fas
 
 4. **Every new WSL session**:
    ```bash
-   cd /mnt/c/Users/YOUR_USER/Abadd0n-Ai
+   cd /mnt/c/Users/YOUR_USER/Abadd0n-4B
    source venv_wsl/bin/activate
    ```
 
 ### B) Manual (same result as the script)
 
 ```bash
-cd /path/to/Abadd0n-Ai
+cd /path/to/Abadd0n-4B
 python3 -m venv venv_wsl
 source venv_wsl/bin/activate
 python -m pip install -U pip wheel
@@ -130,7 +153,7 @@ PYTHONUNBUFFERED=1 python -u linux/wsl_check.py
 ## Native Linux (not WSL)
 
 ```bash
-cd /path/to/Abadd0n-Ai
+cd /path/to/Abadd0n-4B
 chmod +x linux/setup.sh
 ./linux/setup.sh
 ```
@@ -147,7 +170,7 @@ More detail: `linux/README.md`.
 | Task | You need |
 |------|-----------|
 | **QLoRA chat (`main.py`)** | A trained **`lora_model/`** directory (from step below) at the repo root. |
-| **QLoRA training** | **`dataset.jsonl`** at the repo root (Alpaca `instruction`/`output` or ChatML `messages`). Includes multilingual coding rows (Python, HTML, PHP, JS/TS, Java, C/C++, Go, Rust, legacy notes); extend with `python dataset_builder.py --generate`. |
+| **QLoRA training** | **`dataset.jsonl`** at the repo root (Alpaca `instruction`/`output` or ChatML `messages`). Includes multilingual coding, CLI/skills/docs/fetch/patch examples; extend with `python dataset_builder.py --generate --validate`. |
 | **Character LM (`train.py`)** | **`data.txt`** at the repo root (plain text corpus). |
 
 ---
@@ -162,12 +185,30 @@ python unsloth_lora_train.py
 ```
 Checkpoints also go under `outputs/` per script defaults.
 
-### 2) Chat
+### 2) Export to Ollama (Abadd0n-4B)
+
+After training (or if `lora_model/` already exists), export to [Ollama](https://ollama.com) as **Abadd0n-4B**:
+
+```bash
+python export_ollama.py
+```
+
+This merges LoRA, exports to GGUF, writes a Modelfile with the Abadd0n persona, and runs `ollama create Abadd0n-4B`. Use `--no-create` to only produce GGUF + Modelfile without invoking Ollama.
+
+**During training:** Set `EXPORT_GGUF = True` in `unsloth_lora_train.py` to export automatically after a run (writes to `abadd0n_gguf/`). Requires `ollama` in `PATH` for `ollama create`.
+
+**Larger base:** For a true 4B model, use `unsloth/Qwen3-4B-bnb-4bit` as `MODEL_NAME` in `unsloth_lora_train.py` (needs ~8 GB VRAM).
+
+### 3) Chat
 ```bash
 python main.py
+# or
+python cli.py
 ```
 - Type messages at the prompt; `exit` quits; `clear` resets conversation memory.
-- **Slash tools (no API):** type `/tools` for `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn` — inspect and syntax-check files under the repo before asking the model.
+- **Tab:** quick actions (exit, clear, tools). **/** slash menu: settings, gateway, agent, send, media, onboarding, doctor.
+- **Slash menu:** press `/` for dropdown (clear, settings, tools, gateway, agent, send, media, onboarding, doctor, exit). Tab cycles, Enter selects.
+- **Slash tools:** `/tools` for `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn` — inspect and syntax-check files. `/skills` (search bar, browse, install), `/docs <query>`, `/fetch <url>`, `/patch <file>`, `/grant`, `/new`.
 - **Files / code:** ask for a script or file; if the model replies with `<write_file path="relative/path">…</write_file>` (or legacy `<edit_file>`), the CLI queues each eligible path and shows a short review panel per path:
   - summary (new vs overwrite), resolved path, payload size + line count
   - a trimmed content preview (so you can sanity-check)
@@ -176,12 +217,25 @@ python main.py
 - If `ABADDON_AUTO_APPROVE_WRITES=1`, the review panels are skipped and files are written without prompts (still sandbox-restricted by the write root rules).
 - First launch: Unsloth can sit **silent for several minutes** while Triton/JIT runs — see troubleshooting below.
 
-### 3) DPO (optional, after SFT)
+### 4) Platform CLI (subcommands)
+```bash
+python main.py gateway     # WS control plane (stub)
+python main.py agent      # RPC runtime with tool/block streaming
+python main.py agent --message "Create hello.py"   # Single-turn, auto-approves writes
+python main.py agent --tools                      # List available tools
+python main.py send       # Message delivery (stub)
+python main.py onboarding # First-run setup (stub)
+python main.py doctor     # Diagnostics (run without loading model: python cli.py doctor)
+```
+
+**Agent tools** (inspired by [OpenClaw](https://github.com/openclaw/openclaw)): write_file, read_file, list_dir, find_in_files, run_bash, compile_python, apply_patch. Slash commands (/read, /ls, /find, /compile, /patch) work in interactive agent mode. ClawHub skills from `project/skills/` and `ABADDON_SKILLS_DIR` are injected into the agent.
+
+### 5) DPO (optional, after SFT)
 ```bash
 python dpo_train.py
 ```
 
-### 4) Character-level pre-training (separate small model in `llm.py`)
+### 6) Character-level pre-training (separate small model in `llm.py`)
 ```bash
 python train.py --data data.txt --epochs 1000
 ```
@@ -189,6 +243,10 @@ Use `python train.py --help` for all flags.
 
 ### Diagnostics
 ```bash
+python cli.py doctor     # Fast (no model load): PyTorch, pre_unsloth, paths
+python main.py doctor    # Full: above + Unsloth import
+python -m tests.test_tools --skip-network   # Tools test (offline)
+python -m tests.test_tools                  # Full test including /docs, /fetch
 python check_torch.py
 python debug_unsloth.py
 ```
@@ -206,7 +264,9 @@ python debug_unsloth.py
 | `ABADDON_NO_SPINNER=1` | Disable the one-line loading spinner before replies in `main.py`. |
 | `ABADDON_MAX_NEW_TOKENS` | Override max new tokens (integer); otherwise chat uses ~100, coding-style prompts use more (capped by context). |
 | `ABADDON_WRITE_ROOT` | Extra allowed root directory for `<write_file>` / `<edit_file>` paths (in addition to the repo root). |
+| `ABADDON_SKILLS_DIR` | Global skills directory (default: `~/.abaddon/skills` when using `--global`); loaded into agent across all projects. |
 | `ABADDON_ALLOW_WRITES_OUTSIDE_ROOT=1` | Allow any absolute path on disk (dangerous). |
+| `CLAWHUB_API_BASE` | Override ClawHub API URL (default: https://clawhub.ai). |
 | `ABADDON_AUTO_APPROVE_WRITES=1` | Skip y/n confirmation for each file write (dangerous). |
 | `UNSLOTH_ENABLE_LOGGING=1` | More verbose Unsloth / Triton logging (noisy). |
 | `PYTHONUNBUFFERED=1` | Flush logs immediately (useful with `python -u main.py`). |

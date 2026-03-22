@@ -76,8 +76,9 @@ if __name__ == '__main__':
     LOGGING_STEPS     = 5
     SAVE_STEPS        = 50
     
-    EXPORT_GGUF  = False   # Set True to save GGUF after training (needs llama.cpp)
-    GGUF_QUANT   = "q4_k_m"
+    EXPORT_GGUF       = False   # Set True to save GGUF after training (needs llama.cpp)
+    GGUF_QUANT        = "q4_k_m"
+    OLLAMA_MODEL_NAME = "Abadd0n-4B"
     
     print("=" * 60)
     print("  Abadd0n — QLoRA Fine-Tuning (Unsloth / Qwen3)")
@@ -249,11 +250,22 @@ if __name__ == '__main__':
     
         # ── Optional: merge + save GGUF for Ollama ──────────────
         if EXPORT_GGUF:
+            from ollama_export import write_modelfile
+            from persona import PERSONA
+
+            gguf_dir = "abadd0n_gguf"
             print(f"\nExporting merged model to GGUF ({GGUF_QUANT}) …")
             model.save_pretrained_merged("abadd0n_merged", tokenizer, save_method="merged_16bit")
-            model.save_pretrained_gguf("abadd0n_gguf", tokenizer, quantization_method=GGUF_QUANT)
-            print("  [OK] GGUF saved to ./abadd0n_gguf  — load with Ollama:")
-            print("      ollama create abadd0n -f ./abadd0n_gguf/Modelfile")
+            model.save_pretrained_gguf(gguf_dir, tokenizer, quantization_method=GGUF_QUANT)
+            write_modelfile(
+                gguf_dir,
+                model_name=OLLAMA_MODEL_NAME,
+                persona=PERSONA,
+                num_ctx=MAX_SEQ_LENGTH,
+                temperature=0.8,
+            )
+            print(f"  [OK] GGUF + Modelfile saved to ./{gguf_dir}")
+            print(f"      ollama create {OLLAMA_MODEL_NAME} -f ./{gguf_dir}/Modelfile")
     
         print("\n╔══════════════════════════════════╗")
         print("║  Abadd0n training complete! [OK] ║")

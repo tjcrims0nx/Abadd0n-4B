@@ -11,7 +11,7 @@ source venv_wsl/bin/activate
 python main.py
 ```
 
-Uses `linux/requirements_wsl.txt` after PyTorch is present in the venv. See the main [README](../README.md) for CUDA notes.
+Uses `linux/requirements_wsl.txt` after PyTorch is present in the venv. See the main [README](../README.md) for CUDA notes. Use `python cli.py doctor` for fast diagnostics (no model load); `python export_ollama.py` to export LoRA to Ollama.
 
 ## Native Linux
 

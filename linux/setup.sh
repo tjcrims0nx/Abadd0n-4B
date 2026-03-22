@@ -35,5 +35,8 @@ python -c "import pre_unsloth; pre_unsloth.before_import(); import torch._induct
 
 echo ""
 echo "Done.  source venv/bin/activate"
-echo "       python main.py"
-echo "       python linux/wsl_check.py   # full Unsloth smoke test (slow first time)"
+echo "       python main.py   or   python cli.py"
+echo "       python cli.py doctor   # diagnostics (no model load)"
+echo "       python -m tests.test_tools --skip-network   # tools test"
+echo "       python dataset_builder.py --generate --validate   # prepare dataset"
+echo "       python unsloth_lora_train.py   # QLoRA  |  python export_ollama.py"
