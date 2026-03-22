@@ -1,5 +1,7 @@
 # Abadd0n — Linux / WSL
 
+> **⚠️ Untested:** Linux and WSL install/environment have not been verified. Use at your own risk.
+
 ## WSL2 (recommended for GPU)
 
 From the repo root in WSL:

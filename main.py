@@ -1,10 +1,18 @@
+import sys
+from pathlib import Path
+# Must run in venv_win or venv_wsl (avoids loading from global Python without LoRA)
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+import venv_check
+venv_check.require_abaddon_venv()
+
 import pre_unsloth
 pre_unsloth.before_import()
 
 import inspect
 import torch
 import os
-import sys
 import threading
 import warnings
 

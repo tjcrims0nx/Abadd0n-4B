@@ -56,6 +56,7 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `train.py` | Character-level pre-train (`llm.py` + `data.txt`) |
 | `llm.py` | Small custom decoder for `train.py` |
 | `dataset_builder.py` | Helpers for building / checking data |
+| `venv_check.py` | Ensures main/export/train run inside venv_win or venv_wsl |
 | `check_torch.py`, `debug_unsloth.py` | Diagnostics |
 | `requirements.txt` | Windows + CUDA 12.1 PyTorch stack + googlesearch-python (full install) |
 | `setup.bat` | `cd` to repo, creates `venv_win\`, `pip install -r requirements.txt`, verifies PyTorch + `pre_unsloth` inductor compat |
@@ -108,6 +109,8 @@ Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_c
 
 ## WSL2 (Ubuntu) — exact setup
 
+> **⚠️ Untested:** The Linux/WSL install and environment have not been verified. The instructions below are provided as-is; use at your own risk and expect possible adjustments.
+
 Repo on `\\wsl$\...` or `/mnt/c/...` is fine; first Unsloth import is **much faster** if the project lives under your Linux home (e.g. `~/code/Abadd0n-4B`).
 
 ### A) Automated (recommended)
@@ -155,6 +158,8 @@ PYTHONUNBUFFERED=1 python -u linux/wsl_check.py
 
 ## Native Linux (not WSL)
 
+> **⚠️ Untested:** Same as WSL — native Linux setup is unverified.
+
 ```bash
 cd /path/to/Abadd0n-4B
 chmod +x linux/setup.sh
@@ -180,10 +185,16 @@ More detail: `linux/README.md`.
 
 ## Run — exact commands
 
-Activate the venv first (`venv_win\Scripts\activate` or `source venv_wsl/bin/activate`), `cd` to repo root.
+**Important:** Always activate the venv first. Abadd0n enforces this so the LoRA-trained model loads correctly (running without venv uses global Python and skips your updates).
+```bash
+venv_win\Scripts\activate    # Windows
+source venv_wsl/bin/activate # WSL
+cd /path/to/Abadd0n-4B
+```
 
 ### 1) QLoRA fine-tune (produces `lora_model/`)
 ```bash
+venv_win\Scripts\activate    # Windows (or source venv_wsl/bin/activate on WSL)
 python unsloth_lora_train.py
 ```
 Checkpoints also go under `outputs/` per script defaults.
@@ -193,6 +204,7 @@ Checkpoints also go under `outputs/` per script defaults.
 After training (or if `lora_model/` already exists), export to [Ollama](https://ollama.com) as **Abadd0n-4B**:
 
 ```bash
+venv_win\Scripts\activate    # Windows (or source venv_wsl/bin/activate on WSL)
 python export_ollama.py
 ```
 
@@ -204,6 +216,10 @@ This merges LoRA, exports to GGUF, writes a Modelfile with the Abadd0n persona, 
 
 ### 3) Chat
 ```bash
+# Activate venv first (required — ensures LoRA/updates load correctly)
+venv_win\Scripts\activate    # Windows
+source venv_wsl/bin/activate # WSL
+
 python main.py
 # or
 python cli.py

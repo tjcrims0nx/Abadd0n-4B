@@ -4,15 +4,24 @@ Export trained Abadd0n LoRA to Ollama as Abadd0n-4B.
 Loads lora_model/, merges, exports to GGUF, writes a Modelfile with the Abadd0n
 persona, and optionally runs `ollama create Abadd0n-4B`.
 
-Usage:
+Usage (activate venv first):
+    venv_win\\Scripts\\activate   # Windows
+    source venv_wsl/bin/activate # WSL
     python export_ollama.py
-    python export_ollama.py --lora-path ./lora_model --output-dir ./abadd0n_gguf --no-create
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+# Must run in venv_win or venv_wsl
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+import venv_check
+venv_check.require_abaddon_venv()
 
 from ollama_export import OLLAMA_MODEL_NAME, export_lora_to_ollama
 

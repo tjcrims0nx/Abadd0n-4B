@@ -7,12 +7,21 @@ Method:  QLoRA via Unsloth + SFTTrainer (instruction tuning, chat template)
 Dataset:  dataset.jsonl — Alpaca or ChatML rows; includes multilingual coding examples (see dataset_builder.py).
 Output:  LoRA adapters  →  optionally merged & exported to GGUF for Ollama
 
-Usage:
+Usage (activate venv first):
+    venv_win\\Scripts\\activate   # Windows
+    source venv_wsl/bin/activate  # WSL
     python unsloth_lora_train.py
-
-Requirements (run in qlora_env):
-    pip install unsloth trl transformers datasets peft bitsandbytes
 """
+
+import sys
+from pathlib import Path
+
+# Must run in venv_win or venv_wsl (ensures correct LoRA/training env)
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+import venv_check
+venv_check.require_abaddon_venv()
 
 import torch
 import pre_unsloth

@@ -64,7 +64,8 @@ echo.
 echo ========================================
 echo   Setup complete
 echo ========================================
-echo   Activate:  venv_win\Scripts\activate
+echo   ALWAYS activate before chat/train/export:
+echo   venv_win\Scripts\activate
 echo   Chat:     python main.py   or  python cli.py
 echo   Doctor:   python cli.py doctor   (fast)  or  python main.py doctor
 echo   Tools:    python -m tests.test_tools --skip-network

@@ -2,13 +2,13 @@
 """
 Abadd0n CLI entry point.
 
-Usage:
-  python cli.py              # Chat (default)
-  python cli.py gateway     # Gateway WS control plane
-  python cli.py agent        # Agent RPC runtime
-  python cli.py send        # Send CLI
-  python cli.py onboarding  # Onboarding
-  python cli.py doctor      # Diagnostics
+Usage (activate venv first):
+  venv_win\\Scripts\\activate   # Windows
+  source venv_wsl/bin/activate  # WSL
+  python cli.py                 # Chat (default)
+  python cli.py gateway         # Gateway WS control plane
+  python cli.py agent           # Agent RPC runtime
+  python cli.py doctor          # Diagnostics
 """
 
 import sys
@@ -17,6 +17,8 @@ from pathlib import Path
 _root = Path(__file__).resolve().parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
+import venv_check
+venv_check.require_abaddon_venv()
 
 
 def main() -> int:
