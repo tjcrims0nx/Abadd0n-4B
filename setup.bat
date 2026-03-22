@@ -67,7 +67,7 @@ echo ========================================
 echo   Activate:  venv_win\Scripts\activate
 echo   Chat:     python main.py   or  python cli.py
 echo   Doctor:   python cli.py doctor   (fast)  or  python main.py doctor
-echo   Tools:    python tests\test_tools.py --skip-network
+echo   Tools:    python -m tests.test_tools --skip-network
 echo   QLoRA:    python unsloth_lora_train.py
 echo   Dataset:  python dataset_builder.py --generate --validate
 echo   Export:   python export_ollama.py   (lora_model/ -^> Ollama Abadd0n-4B)

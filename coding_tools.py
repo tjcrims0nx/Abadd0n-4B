@@ -120,6 +120,8 @@ def print_tools_help(colors: dict[str, str]) -> None:
         ("/compile <file.py>", "Syntax-check Python"),
         ("/grant", "Grant/revoke system file access"),
         ("/new", "Start new chat thread"),
+        ("/math <expr>", "Evaluate math (e.g. 2+3*4, sqrt(16), sin(pi/2))"),
+        ("/search <query>", "Web search (Google)"),
         ("/docs <query>", "Search OpenClaw docs (docs.openclaw.ai)"),
         ("/fetch <url>", "Fetch URL (web_fetch)"),
         ("/patch <file>", "Apply OpenClaw-style patch file"),
@@ -471,6 +473,55 @@ def _cmd_docs(args: list[str], colors: dict[str, str]) -> None:
     print(rule)
 
 
+def _cmd_math(args: list[str], colors: dict[str, str]) -> None:
+    """Evaluate math: /math 2+3*4 or /math sqrt(16)"""
+    try:
+        from core.math_tool import evaluate_math
+    except ImportError as e:
+        print(error("Math", f"core.math_tool not available: {e}"))
+        return
+    if not args:
+        print(muted("Usage: /math <expression>   e.g. /math 2+3*4  /math sqrt(16)"))
+        return
+    expr = " ".join(args)
+    r = evaluate_math(expr)
+    if r.get("ok"):
+        print(success(str(r["result"]), expr))
+    else:
+        print(error("Math", r.get("error", "failed")))
+
+
+def _cmd_search(args: list[str], colors: dict[str, str]) -> None:
+    """Web search: /search <query>"""
+    try:
+        from core.web_search import web_search
+    except ImportError as e:
+        print(error("Search", f"core.web_search not available: {e}"))
+        return
+    if not args:
+        print(muted("Usage: /search <query>   e.g. /search Python asyncio tutorial"))
+        return
+    q = " ".join(args)
+    r = web_search(q)
+    if not r.get("ok"):
+        print(error("Search", r.get("error", "failed")))
+        return
+    results = r.get("results", [])
+    if not results:
+        print(muted("No results"))
+        return
+    label = colors.get("label", LABEL)
+    print(f"\n{label}Web search{RESET} {DIM}\u2014{RESET} {q}")
+    print(f"{DIM}{BOX_H * 60}{RESET}")
+    for i, item in enumerate(results[:8], 1):
+        print(f"  {i}. {WHITE}{item.get('title', '?')}{RESET}")
+        print(f"     {DIM}{item.get('href', '')}{RESET}")
+        body = (item.get("body") or "")[:120]
+        if body:
+            print(f"     {GRAY}{body}{'…' if len(body) >= 120 else ''}{RESET}")
+    print(f"{DIM}{BOX_H * 60}{RESET}")
+
+
 def _cmd_fetch(args: list[str], colors: dict[str, str]) -> None:
     """Fetch URL: /fetch <url> (web_fetch)"""
     try:
@@ -561,6 +612,12 @@ def handle_slash_command(user_input: str, project_root: Path, colors: dict[str, 
         return True
     if cmd == "skills":
         _cmd_skills(args, project_root, colors)
+        return True
+    if cmd == "math":
+        _cmd_math(args, colors)
+        return True
+    if cmd == "search":
+        _cmd_search(args, colors)
         return True
     if cmd == "docs":
         _cmd_docs(args, colors)

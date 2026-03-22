@@ -48,6 +48,10 @@ outputs/
 # User data
 conversations/
 
+# Test run artifacts
+tests/_test_tools_run/
+tests/_slash_run/
+
 # OS
 .DS_Store
 Thumbs.db

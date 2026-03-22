@@ -21,3 +21,5 @@ bitsandbytes
 spinners==0.0.24
 rich>=13.0.0
 readchar>=4.0.0
+# Web search (Google, no API key)
+googlesearch-python>=1.2.0

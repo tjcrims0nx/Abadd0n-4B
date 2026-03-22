@@ -340,6 +340,8 @@ _EDIT_FILE_RE = re.compile(
     r"<edit_file\s+path\s*=\s*[\"']([^\"']+)[\"']\s*>(.*?)</edit_file>",
     re.DOTALL | re.IGNORECASE,
 )
+_MATH_RE = re.compile(r"<math>(.*?)</math>", re.DOTALL | re.IGNORECASE)
+_SEARCH_RE = re.compile(r"<search>(.*?)</search>", re.DOTALL | re.IGNORECASE)
 
 
 def _write_roots() -> list[Path]:
@@ -471,6 +473,67 @@ def _prompt_pending_file_write(
             f"{DIM}  Unrecognized input. Enter {LABEL}y{RESET}{DIM} (yes), {LABEL}n{RESET}{DIM} (no),"
             f" or {LABEL}a{RESET}{DIM} (approve all remaining).{RESET}"
         )
+
+
+def _handle_interactive_requests(user_input: str) -> tuple[str, str | None]:
+    """
+    Intercept math and search requests in chat. Returns (message_for_model, direct_response).
+    If direct_response is not None, skip the model and show it. Else use message_for_model (may be enriched).
+    """
+    raw = user_input.strip()
+    lower = raw.lower()
+
+    # ── Search: "search for X", "google X", "look up X", "find X"
+    search_prefixes = ("search for ", "search ", "google ", "look up ", "find ", "lookup ")
+    for p in search_prefixes:
+        if lower.startswith(p):
+            query = raw[len(p):].strip()
+            if query:
+                try:
+                    from core.web_search import web_search
+                    r = web_search(query, max_results=6)
+                    if r.get("ok") and r.get("results"):
+                        ctx = "Web search results:\n" + "\n".join(
+                            f"{i}. {x['title']} — {x['href']}\n   {x.get('body', '')[:200]}"
+                            for i, x in enumerate(r["results"], 1)
+                        )
+                        enriched = f"[Context from Google search]\n{ctx}\n\nUser: {raw}"
+                        return (enriched, None)
+                except Exception:
+                    pass
+            break
+
+    # ── Math: "what is X", "calculate X", "compute X", or pure expression
+    math_prefixes = ("what is ", "what's ", "calculate ", "compute ", "evaluate ", "solve ")
+    for p in math_prefixes:
+        if lower.startswith(p):
+            expr = raw[len(p):].strip().rstrip("?")
+            expr = expr.replace("% of ", "*0.01*").replace("% of", "*0.01*")
+            try:
+                from core.math_tool import evaluate_math
+                r = evaluate_math(expr)
+                if r.get("ok"):
+                    result = r["result"]
+                    direct = f"{LABEL}{result}{RESET}  {DIM}({expr}){RESET}"
+                    return (raw, direct)  # Pass through for model, but we'll use direct
+            except Exception:
+                pass
+            break
+
+    # Pure math expression (e.g. "2+3*4" or "sqrt(16)"): short, no spaces, has operators/digits
+    if raw and len(raw) < 60 and " " not in raw:
+        math_chars = set("0123456789+-*/.()%e ")
+        if any(c in raw for c in "+-*/()") or "sqrt" in lower or "sin" in lower or "cos" in lower:
+            try:
+                from core.math_tool import evaluate_math
+                r = evaluate_math(raw)
+                if r.get("ok"):
+                    direct = f"{LABEL}{r['result']}{RESET}"
+                    return (raw, direct)
+            except Exception:
+                pass
+
+    return (raw, None)
 
 
 def _looks_like_coding_request(text: str) -> bool:
@@ -709,9 +772,37 @@ def chat(model, tokenizer, user_input, conversation_history):
     if "<think>" in response:
         response = response.split("</think>")[-1].strip()
     
+    response = _expand_math_and_search(response)
     conversation_history.append({"role": "assistant", "content": response})
     
     return response
+
+def _expand_math_and_search(response: str) -> str:
+    """Replace <math>expr</math> and <search>query</search> in response with computed results."""
+    def _math_repl(m):
+        try:
+            from core.math_tool import evaluate_math
+            r = evaluate_math(m.group(1).strip())
+            return str(r["result"]) if r.get("ok") else m.group(0)
+        except Exception:
+            return m.group(0)
+
+    def _search_repl(m):
+        try:
+            from core.web_search import web_search
+            q = m.group(1).strip()
+            r = web_search(q, max_results=5)
+            if not r.get("ok") or not r.get("results"):
+                return m.group(0)
+            lines = [f"{i}. {x['title']}: {x['href']}" for i, x in enumerate(r["results"], 1)]
+            return "[Web search: " + "; ".join(lines[:3]) + "]"
+        except Exception:
+            return m.group(0)
+
+    response = _MATH_RE.sub(_math_repl, response)
+    response = _SEARCH_RE.sub(_search_repl, response)
+    return response
+
 
 def handle_file_edits(response):
     """Parse <write_file> and <edit_file> tags; write under project root (confirm each unless auto)."""
@@ -1106,9 +1197,16 @@ def main():
 
         _print_user_prompt_box(user_input)
 
+        message_for_model, direct_response = _handle_interactive_requests(user_input)
+        if direct_response is not None:
+            print(f"\n{GRAY}Abadd0n{RESET} {DIM}\u2192{RESET} {FG_DEFAULT}{direct_response}{RESET}\n")
+            conversation_history.append({"role": "user", "content": user_input})
+            conversation_history.append({"role": "assistant", "content": re.sub(r"\033\[[0-9;]*m", "", direct_response)})
+            continue
+
         try:
             # chat() now prints internally via streamer
-            response = chat(model, tokenizer, user_input, conversation_history)
+            response = chat(model, tokenizer, message_for_model, conversation_history)
             
             # Execute file edits if any
             handle_file_edits(response)

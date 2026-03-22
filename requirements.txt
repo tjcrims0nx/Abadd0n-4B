@@ -24,3 +24,5 @@ spinners==0.0.24
 # CLI: slash menu, Tab quick actions, syntax highlighting, panels
 rich>=13.0.0
 readchar>=4.0.0
+# Web search (no API key, Google)
+googlesearch-python>=1.2.0

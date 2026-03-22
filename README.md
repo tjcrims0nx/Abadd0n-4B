@@ -23,6 +23,7 @@ Abadd0n uses a decoder-only transformer architecture with:
 - **Unsloth Integration**: Optimized for 2x faster 4-bit QLoRA fine-tuning.
 - **Core Platform**: Gateway (WS control), agent (RPC), session model, media pipeline stubs. CLI: `gateway`, `agent`, `send`, `onboarding`, `doctor`.
 - **CLI**: Slash menu (`/`), Tab quick actions, syntax highlighting, file tools (`/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`).
+- **Math & search**: Chat accepts "what is 2+3*4", "search for Python tutorial", "google asyncio" — math is evaluated directly; search enriches context via Google. `/math` and `/search` slash commands also work.
 - **ClawHub skills**: Interactive search bar (`/skills`), browse, search, and install [OpenClaw skills](https://clawhub.ai) via `/skills install <slug>` (add `--global` for all projects); skills injected into agent.
 - **Docs & fetch**: `/docs <query>` searches [docs.openclaw.ai](https://docs.openclaw.ai); `/fetch <url>` retrieves page content; `/patch <file>` applies OpenClaw-style patches.
 - **DPO (Direct Preference Optimization)**: Alignment script included for human preference tuning.
@@ -41,6 +42,8 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `core/clawhub.py` | ClawHub API client (search, download); loads `project/skills/*/SKILL.md` + `ABADDON_SKILLS_DIR` into agent |
 | `core/docs_openclaw.py` | OpenClaw docs search (docs.openclaw.ai/llms.txt) |
 | `core/web_fetch.py` | URL fetch with HTML-to-text extraction |
+| `core/math_tool.py` | Safe math evaluation (arithmetic, sqrt, sin, etc.) |
+| `core/web_search.py` | Web search via Google (no API key) |
 | `ascii_banner.txt` | Optional startup ASCII art (cropped to terminal; replace to customize) |
 | `cli_theme.py` | CLI design system (colors, icons, spacing per [CLI guidelines](https://yannglt.com/writing/designing-for-command-line-interface)) |
 | `coding_tools.py` | Local `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn`; `/docs`, `/fetch`, `/patch`; `/skills` (ClawHub) |
@@ -54,7 +57,7 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `llm.py` | Small custom decoder for `train.py` |
 | `dataset_builder.py` | Helpers for building / checking data |
 | `check_torch.py`, `debug_unsloth.py` | Diagnostics |
-| `requirements.txt` | Windows + CUDA 12.1 PyTorch stack (full install) |
+| `requirements.txt` | Windows + CUDA 12.1 PyTorch stack + googlesearch-python (full install) |
 | `setup.bat` | `cd` to repo, creates `venv_win\`, `pip install -r requirements.txt`, verifies PyTorch + `pre_unsloth` inductor compat |
 | `linux/setup_wsl.sh` | WSL: caches under `~/.cache`, `requirements_wsl.txt`, runs `linux/wsl_check.py` (full Unsloth import) |
 | `linux/setup.sh` | Native Linux: `venv/` + CPU PyTorch + `requirements_wsl.txt` + `pre_unsloth` check; on WSL delegates to `setup_wsl.sh` |
@@ -208,7 +211,8 @@ python cli.py
 - Type messages at the prompt; `exit` quits; `clear` resets conversation memory.
 - **Tab:** quick actions (exit, clear, tools). **/** slash menu: settings, gateway, agent, send, media, onboarding, doctor.
 - **Slash menu:** press `/` for dropdown (clear, settings, tools, gateway, agent, send, media, onboarding, doctor, exit). Tab cycles, Enter selects.
-- **Slash tools:** `/tools` for `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn` — inspect and syntax-check files. `/skills` (search bar, browse, install), `/docs <query>`, `/fetch <url>`, `/patch <file>`, `/grant`, `/new`.
+- **Slash tools:** `/tools` for `/read`, `/ls`, `/find`, `/tree`, `/compile`, `/learn` — inspect and syntax-check files. `/math <expr>`, `/search <query>` (Google). `/skills` (search bar, browse, install), `/docs <query>`, `/fetch <url>`, `/patch <file>`, `/grant`, `/new`.
+- **Interactive math & search:** In chat, type "what is 2+3*4" or "search for Python asyncio" — math evaluates directly; search fetches Google results and injects context.
 - **Files / code:** ask for a script or file; if the model replies with `<write_file path="relative/path">…</write_file>` (or legacy `<edit_file>`), the CLI queues each eligible path and shows a short review panel per path:
   - summary (new vs overwrite), resolved path, payload size + line count
   - a trimmed content preview (so you can sanity-check)

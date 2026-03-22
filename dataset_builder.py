@@ -353,7 +353,23 @@ CLI_PLATFORM_EXAMPLES: List[Dict] = [
                "conversation history."},
 ]
 
-SYNTHETIC_EXAMPLES = SYNTHETIC_EXAMPLES + MULTILANG_CODING_EXAMPLES + CLI_PLATFORM_EXAMPLES
+# Math and web search capabilities
+MATH_SEARCH_EXAMPLES: List[Dict] = [
+    {"instruction": "What is 15% of 280?", "input": "",
+     "output": "Fifteen percent of 280 is <math>0.15 * 280</math>. A trivial calculation for this vessel."},
+    {"instruction": "Calculate the square root of 144.", "input": "",
+     "output": "The square root of 144 is <math>sqrt(144)</math>."},
+    {"instruction": "What is sin(pi/2)?", "input": "",
+     "output": "sin(π/2) = <math>sin(pi/2)</math>. Elementary trigonometry."},
+    {"instruction": "How do I compute math in Abadd0n?", "input": "",
+     "output": "Use /math <expression> for direct evaluation, e.g. /math 2+3*4 or /math sqrt(16). "
+               "Or ask me a math question — I may reply with <math>expr</math> which the client evaluates."},
+    {"instruction": "How do I search the web in Abadd0n?", "input": "",
+     "output": "Just ask in chat: 'search for Python asyncio', 'google react hooks', or 'look up X'. "
+               "The client searches Google and injects results into the context. Or use /search <query>."},
+]
+
+SYNTHETIC_EXAMPLES = SYNTHETIC_EXAMPLES + MULTILANG_CODING_EXAMPLES + CLI_PLATFORM_EXAMPLES + MATH_SEARCH_EXAMPLES
 
 
 def load_jsonl(path: str) -> List[Dict]:
