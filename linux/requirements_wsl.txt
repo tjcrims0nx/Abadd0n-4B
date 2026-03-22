@@ -9,6 +9,7 @@
 #
 # Pins match the Windows venv: transformers 5.x breaks Unsloth/torchao import order.
 # Add rich/readchar for CLI (slash menu, Tab, panels).
+# googlesearch-python for /search and interactive web search (Google).
 
 unsloth
 unsloth-zoo
