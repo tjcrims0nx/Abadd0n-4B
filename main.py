@@ -168,7 +168,7 @@ def _print_user_prompt_box(text: str) -> None:
         w = max(40, min(76, w))
         print(f"\n{GRAY}{BOX_TL}{BOX_H * (w - 2)}{BOX_TR}{RESET}")
         print(f"{GRAY}{BOX_V}{RESET} {LABEL}You{RESET} {FG_DEFAULT}{text.strip()}{RESET}")
-        print(f"{GRAY}{BOX_BL}{BOX_H * (w - 2)}{BOX_BR}{RESET}\n")
+        print(f"{GRAY}{BOX_BL}{BOX_H * (w - 2)}{BOX_BR}{RESET}")
 
 
 def _cli_panel_width() -> int:
@@ -186,6 +186,8 @@ class _ReplyStreamer(TextStreamer):
         self._on_first_put = on_first_put
         self._in_code = False
         self._in_think = False
+        self._in_chat_msg = False
+        self._chat_tag_buf = ""
         self._think_buf = ""
         self._pending = ""
         self._code_accum = ""
@@ -275,11 +277,14 @@ class _ReplyStreamer(TextStreamer):
         sys.stdout.flush()
 
     def _emit_stream_chunk(self, chunk: str) -> None:
-        data = self._think_buf + self._pending + chunk
+        data = self._think_buf + self._chat_tag_buf + self._pending + chunk
         self._think_buf = ""
+        self._chat_tag_buf = ""
         self._pending = ""
 
         # Filter <think>...</think> blocks (don't display internal reasoning)
+        # Filter <chat_message>...</chat_message> (show content, strip tags)
+        # Filter orphaned <url ...> fragments (strip for cleaner display)
         visible: list[str] = []
         while data:
             if self._in_think:
@@ -297,23 +302,60 @@ class _ReplyStreamer(TextStreamer):
                 data = data[i + 8 :]
                 self._in_think = False
                 continue
-            i = data.find("<think>")
-            if i < 0:
-                for n in range(7, 0, -1):
-                    if len(data) >= n and data[-n:] == "<think>"[:n]:
-                        visible.append(data[:-n])
-                        self._think_buf = data[-n:]
+            if self._in_chat_msg:
+                i = data.find("</chat_message>")
+                if i < 0:
+                    for n in range(14, 0, -1):
+                        if len(data) >= n and data[-n:] == "</chat_message>"[:n]:
+                            visible.append(data[:-n])
+                            self._chat_tag_buf = data[-n:]
+                            data = "".join(visible)
+                            break
+                    else:
+                        visible.append(data)
                         data = "".join(visible)
-                        break
-                else:
-                    visible.append(data)
+                    break
+                visible.append(data[:i])
+                data = data[i + 15 :]
+                self._in_chat_msg = False
+                continue
+            i = data.find("<chat_message>")
+            if i >= 0:
+                visible.append(data[:i])
+                data = data[i + 14 :]
+                self._in_chat_msg = True
+                continue
+            for n in range(13, 0, -1):
+                if len(data) >= n and data[-n:] == "<chat_message>"[:n]:
+                    visible.append(data[:-n])
+                    self._chat_tag_buf = data[-n:]
                     data = "".join(visible)
-                break
-            visible.append(data[:i])
-            data = data[i + 7 :]
-            self._in_think = True
+                    break
+            else:
+                i = data.find("<think>")
+                if i < 0:
+                    for n in range(7, 0, -1):
+                        if len(data) >= n and data[-n:] == "<think>"[:n]:
+                            visible.append(data[:-n])
+                            self._think_buf = data[-n:]
+                            data = "".join(visible)
+                            break
+                    else:
+                        visible.append(data)
+                        data = "".join(visible)
+                    break
+                visible.append(data[:i])
+                data = data[i + 7 :]
+                self._in_think = True
+                continue
+            break
 
         data = "".join(visible)
+
+        # Strip orphaned <url ...> fragments (incomplete tags, model artifacts)
+        if "<url" in data:
+            data = re.sub(r"<url\s+href=[^>]*>?", "", data)
+            data = re.sub(r"</url>", "", data)
 
         while data:
             if not self._in_code:
@@ -821,7 +863,10 @@ def chat(model, tokenizer, user_input, conversation_history):
     
     if "<think>" in response:
         response = response.split("</think>")[-1].strip()
-    
+    response = re.sub(r"<chat_message>(.*?)</chat_message>", r"\1", response, flags=re.DOTALL)
+    response = re.sub(r"<url\s+href=[^>]*>?", "", response)
+    response = re.sub(r"</url>", "", response)
+
     response = _expand_math_and_search(response)
     conversation_history.append({"role": "assistant", "content": response})
     
@@ -1070,12 +1115,28 @@ def _get_suggestion(prefix: str, conversation_history: list) -> str | None:
     return None
 
 
-def _redraw_line(prompt_str: str, buf: list[str], suggestion: str | None) -> None:
-    """Redraw input line with optional dimmed suggestion (fish-shell style)."""
-    sys.stdout.write("\r\033[2K")
+def _redraw_line(
+    prompt_str: str,
+    buf: list[str],
+    suggestion: str | None,
+    prompt_for_redraw: str | None = None,
+) -> None:
+    """Redraw input line with optional dimmed suggestion (fish-shell style).
+    Keeps display within one terminal line. Use prompt_for_redraw (no leading \\n) to avoid
+    adding newlines on each keystroke, which pushes content up."""
     line = "".join(buf)
-    sys.stdout.write(prompt_str)
-    sys.stdout.write(line)
+    cols, _ = shutil.get_terminal_size(fallback=(80, 24))
+    draw_prompt = (prompt_for_redraw if prompt_for_redraw is not None else prompt_str).lstrip("\n")
+    prompt_visible = len(re.sub(r"\033\[[0-9;]*m", "", draw_prompt))
+    suggestion_visible = len(suggestion) if suggestion else 0
+    available = max(20, cols - prompt_visible - suggestion_visible - 2)
+    if len(line) > available:
+        display = "…" + line[-available + 1:]
+    else:
+        display = line
+    sys.stdout.write("\r\033[2K")
+    sys.stdout.write(draw_prompt)
+    sys.stdout.write(display)
     if suggestion:
         sys.stdout.write(f"{DIM}{suggestion}{RESET}")
     sys.stdout.flush()
@@ -1233,8 +1294,8 @@ def main():
     ]
     
     print(f"\n{GRAY}{BOX_V}{RESET} {BOLD}{LABEL}Session{RESET} {DIM}\u00b7{RESET} {DIM}replies stream below{RESET}")
-    print(f"{GRAY}{BOX_V}{RESET} {DIM}Markdown code fences render with syntax highlighting{RESET}\n")
-    
+    print(f"{GRAY}{BOX_V}{RESET} {DIM}Markdown code fences render with syntax highlighting{RESET}")
+
     while True:
         try:
             prompt_str = f"\n{GRAY}{BOX_V}{RESET} {LABEL}Message{RESET} {ACCENT}\u2192{RESET} "

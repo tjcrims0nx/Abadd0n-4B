@@ -23,6 +23,7 @@ source venv/bin/activate
 python -m pip install -q -U pip wheel
 
 echo "Installing CPU PyTorch wheels (for CUDA, install from pytorch.org first, then skip this step)."
+echo "  NOTE: Large packages — installation may take several minutes."
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 if [ ! -f "linux/requirements_wsl.txt" ]; then
@@ -30,12 +31,17 @@ if [ ! -f "linux/requirements_wsl.txt" ]; then
   exit 1
 fi
 echo "Installing training stack (linux/requirements_wsl.txt) ..."
+echo "  NOTE: Includes large packages (PyTorch, Unsloth, etc.) — may take several minutes."
 pip install -r linux/requirements_wsl.txt
 
 python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available())"
 
 echo "Verifying pre_unsloth inductor compat (no full Unsloth import) ..."
 python -c "import pre_unsloth; pre_unsloth.before_import(); import torch._inductor.config as c; assert 'triton.enable_persistent_tma_matmul' in c._allowed_keys; print('pre_unsloth inductor compat OK')"
+
+echo ""
+echo "Creating dataset.jsonl (for QLoRA training) …"
+[ -f dataset.jsonl ] && echo "  dataset.jsonl exists — skipping" || python dataset_builder.py --generate --validate
 
 echo ""
 echo "Done. Activate:  source venv/bin/activate"

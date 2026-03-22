@@ -20,10 +20,10 @@ echo.
 
 set "VENV=%~dp0venv_win"
 if not exist "%VENV%\Scripts\python.exe" (
-    echo [1/5] Creating venv_win ...
+    echo [1/6] Creating venv_win ...
     python -m venv "%VENV%"
 ) else (
-    echo [1/5] venv_win already exists — skipping create
+    echo [1/6] venv_win already exists — skipping create
 )
 
 call "%VENV%\Scripts\activate.bat"
@@ -33,10 +33,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [2/5] Upgrading pip ...
+echo [2/6] Upgrading pip ...
 python -m pip install -q --upgrade pip wheel
 
-echo [3/5] Installing dependencies ^(root requirements.txt, CUDA 12.1 index^) ...
+echo [3/6] Installing dependencies ^(root requirements.txt, CUDA 12.1 index^) ...
+echo   NOTE: Includes PyTorch CUDA, Unsloth, etc. — may take several minutes.
+echo.
 if not exist "%~dp0requirements.txt" (
     echo ERROR: requirements.txt not found. Run setup.bat from repo root.
     pause
@@ -49,7 +51,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [4/5] Verifying PyTorch ...
+echo [4/6] Verifying PyTorch ...
 python -c "import torch; print('  PyTorch:', torch.__version__); print('  CUDA:', torch.cuda.is_available())"
 if errorlevel 1 (
     echo ERROR: PyTorch verification failed
@@ -57,12 +59,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [5/5] Verifying pre_unsloth inductor compat ...
+echo [5/6] Verifying pre_unsloth inductor compat ...
 python -c "import pre_unsloth; pre_unsloth.before_import(); import torch._inductor.config as _ic; assert 'triton.enable_persistent_tma_matmul' in _ic._allowed_keys; print('  pre_unsloth: inductor compat OK')"
 if errorlevel 1 (
     echo ERROR: pre_unsloth inductor registration failed
     pause
     exit /b 1
+)
+
+echo.
+echo [6/6] Creating dataset.jsonl ^(for QLoRA training^) ...
+if not exist "%~dp0dataset.jsonl" (
+    python dataset_builder.py --generate --validate
+) else (
+    echo   dataset.jsonl exists — skipping
 )
 
 echo.

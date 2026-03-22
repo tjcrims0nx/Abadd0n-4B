@@ -89,11 +89,11 @@ Generated / local-only (see `.gitignore`): `lora_model/`, `outputs/`, `unsloth_c
    ```
    (Use your real path.)
 
-2. Run the installer (creates `venv_win` next to `requirements.txt` and installs CUDA 12.1 PyTorch + Unsloth stack):
+2. Run the installer (creates `venv_win`, installs CUDA 12.1 PyTorch + Unsloth stack, and creates `dataset.jsonl` for training):
    ```bat
    setup.bat
    ```
-   Wait until it finishes. The script switches to its own directory (so `pre_unsloth` imports work). If `venv_win` already exists, it reuses it and reinstalls/upgrades from `requirements.txt`. The last steps verify PyTorch and that `pre_unsloth` registered GRPO-related inductor options (no full Unsloth download in that check).
+   Wait until it finishes. The script switches to its own directory (so `pre_unsloth` imports work). Large packages may take several minutes. If `venv_win` already exists, it reuses it and reinstalls/upgrades from `requirements.txt`. The last steps verify PyTorch, `pre_unsloth` inductor compat, and create `dataset.jsonl` if missing.
 
 3. **Every new terminal** before `python`:
    ```bat

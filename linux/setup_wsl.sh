@@ -35,10 +35,15 @@ if [ ! -f "linux/requirements_wsl.txt" ]; then
   exit 1
 fi
 echo "[setup_wsl] Installing Unsloth + training deps …"
+echo "  NOTE: Large packages (PyTorch, Unsloth, etc.) — may take several minutes."
 pip install -r linux/requirements_wsl.txt
 
 echo "[setup_wsl] Verifying pre_unsloth + Unsloth import (first run can take 5–20+ min on /mnt/c — be patient) …"
 PYTHONUNBUFFERED=1 python -u linux/wsl_check.py
+
+echo ""
+echo "[setup_wsl] Creating dataset.jsonl (for QLoRA training) …"
+[ -f dataset.jsonl ] && echo "  dataset.jsonl exists — skipping" || python dataset_builder.py --generate --validate
 
 echo ""
 echo "[setup_wsl] Done. Activate with:  source venv_wsl/bin/activate"

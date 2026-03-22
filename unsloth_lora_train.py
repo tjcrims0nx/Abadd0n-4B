@@ -77,7 +77,7 @@ if __name__ == '__main__':
     GRAD_ACCUM_STEPS  = 16   # Effective batch = 16 (simulates batch_size=16)
     WARMUP_RATIO      = 0.05
     NUM_EPOCHS        = 3    # Set to 1 for a quick smoke-test
-    LEARNING_RATE     = 2e-4
+    LEARNING_RATE     = 5e-4   # Enhanced from 2e-4 for faster convergence; reduce if unstable
     LR_SCHEDULER      = "cosine"     # cosine decay works well for SFT
     WEIGHT_DECAY      = 0.01
     OPTIM             = "adamw_8bit"  # 8-bit Adam — saves ~50 % optimiser VRAM
@@ -139,7 +139,13 @@ if __name__ == '__main__':
     #  ④ PREPARE DATASET
     # ══════════════════════════════════════════════════════════════
     print(f"\n[3/5] Loading dataset from {DATASET_PATH} …")
-    
+
+    if not os.path.isfile(DATASET_PATH):
+        raise SystemExit(
+            f"Dataset not found: {DATASET_PATH}\n"
+            f"Create it first with:  python dataset_builder.py --generate --validate"
+        )
+
     def load_jsonl(path: str) -> Dataset:
         """Load a .jsonl file and convert each record into ChatML messages."""
         records = []
