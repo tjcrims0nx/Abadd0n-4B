@@ -5,6 +5,7 @@ Abadd0n CLI entry point.
 Usage (activate venv first):
   venv_win\\Scripts\\activate   # Windows
   source venv_wsl/bin/activate  # WSL
+  source venv/bin/activate     # Native Linux
   python cli.py                 # Chat (default)
   python cli.py gateway         # Gateway WS control plane
   python cli.py agent           # Agent RPC runtime

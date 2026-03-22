@@ -38,35 +38,29 @@ DARK_RED = "\033[91m"
 CYAN = "\033[36m"
 
 
-def _thinking_spinner_frames_interval():
-    """Frames + sleep seconds from [spinners](https://pypi.org/project/spinners/); fallback if missing."""
-    try:
-        from spinners import Spinners
-
-        spec = Spinners.dots12.value
-        return spec["frames"], spec["interval"] / 1000.0
-    except Exception:
-        return ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"], 0.08
+def _contemplating_frames() -> tuple[list[str], float]:
+    """Animated dots for 'contemplating': . -> .. -> ... -> repeat."""
+    return [".", "..", "..."], 0.25
 
 
 @contextlib.contextmanager
 def spinner_context(tty_enabled: bool = True):
     """Spinner while the model generates; cleans up on first token or cancel."""
     if not tty_enabled:
-        sys.stdout.write(f"\n{GRAY}Abadd0n{RESET} {DIM}\u2192{RESET} {FG_DEFAULT} ")
+        sys.stdout.write(f"\n{GRAY}Abadd0n{RESET} {DIM}is contemplating{RESET} {DIM}\"...\"{RESET} ")
         sys.stdout.flush()
         yield lambda: None
         return
 
     stop_event = threading.Event()
-    frames, tick = _thinking_spinner_frames_interval()
+    frames, tick = _contemplating_frames()
     reply_started = [False]
 
     def _spin():
         i = 0
         while not stop_event.wait(tick):
-            fr = frames[i % len(frames)]
-            sys.stdout.write(f"\r{GRAY}Abadd0n{RESET} {DIM}thinking{RESET} {fr} ")
+            dots = frames[i % len(frames)]
+            sys.stdout.write(f"\r{GRAY}Abadd0n{RESET} {DIM}is contemplating{RESET} {DIM}\"{dots}\"{RESET}   ")
             sys.stdout.flush()
             i += 1
 
@@ -191,6 +185,8 @@ class _ReplyStreamer(TextStreamer):
         super().__init__(*args, **kwargs)
         self._on_first_put = on_first_put
         self._in_code = False
+        self._in_think = False
+        self._think_buf = ""
         self._pending = ""
         self._code_accum = ""
         self._code_lang = ""
@@ -279,8 +275,46 @@ class _ReplyStreamer(TextStreamer):
         sys.stdout.flush()
 
     def _emit_stream_chunk(self, chunk: str) -> None:
-        data = self._pending + chunk
+        data = self._think_buf + self._pending + chunk
+        self._think_buf = ""
         self._pending = ""
+
+        # Filter <think>...</think> blocks (don't display internal reasoning)
+        visible: list[str] = []
+        while data:
+            if self._in_think:
+                i = data.find("</think>")
+                if i < 0:
+                    for n in range(8, 0, -1):
+                        if len(data) >= n and data[-n:] == "</think>"[:n]:
+                            self._think_buf = data
+                            data = "".join(visible)
+                            break
+                    else:
+                        self._think_buf = data
+                        data = "".join(visible)
+                    break  # exit while
+                data = data[i + 8 :]
+                self._in_think = False
+                continue
+            i = data.find("<think>")
+            if i < 0:
+                for n in range(7, 0, -1):
+                    if len(data) >= n and data[-n:] == "<think>"[:n]:
+                        visible.append(data[:-n])
+                        self._think_buf = data[-n:]
+                        data = "".join(visible)
+                        break
+                else:
+                    visible.append(data)
+                    data = "".join(visible)
+                break
+            visible.append(data[:i])
+            data = data[i + 7 :]
+            self._in_think = True
+
+        data = "".join(visible)
+
         while data:
             if not self._in_code:
                 i = data.find("```")

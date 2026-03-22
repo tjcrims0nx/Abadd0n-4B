@@ -38,7 +38,9 @@ PYTHONUNBUFFERED=1 python -u linux/wsl_check.py
 
 echo ""
 echo "[setup_wsl] Done. Activate with:  source venv_wsl/bin/activate"
-echo "  Chat:   python main.py  |  cli:  python cli.py"
-echo "  Doctor: python cli.py doctor  |  Tools:  python -m tests.test_tools --skip-network"
-echo "  Dataset: python dataset_builder.py --generate --validate"
-echo "  QLoRA:  python unsloth_lora_train.py  |  Export:  python export_ollama.py"
+echo "  Chat:     python main.py  |  python cli.py"
+echo "  Slash:    /math <expr>  |  /search <query>"
+echo "  Doctor:   python cli.py doctor"
+echo "  Tools:    python -m tests.test_tools --skip-network"
+echo "  Dataset:  python dataset_builder.py --generate --validate"
+echo "  QLoRA:    python unsloth_lora_train.py  |  Export:  python export_ollama.py"

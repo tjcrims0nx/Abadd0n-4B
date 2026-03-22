@@ -2,14 +2,15 @@
 #
 # Prerequisite: PyTorch with CUDA matching your driver (WSL2 usually cu128).
 # Install from https://pytorch.org if needed, e.g.:
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 #
 # Then (from repo root, venv activated):
 #   pip install -r linux/requirements_wsl.txt
 #
 # Pins match the Windows venv: transformers 5.x breaks Unsloth/torchao import order.
-# Add rich/readchar for CLI (slash menu, Tab, panels).
-# googlesearch-python for /search and interactive web search (Google).
+# rich/readchar: CLI slash menu, Tab quick actions, panels.
+# googlesearch-python, beautifulsoup4, requests: /search + interactive web search (no API key).
+# /math uses stdlib only.
 
 unsloth
 unsloth-zoo

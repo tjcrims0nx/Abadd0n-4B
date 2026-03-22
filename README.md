@@ -56,13 +56,13 @@ Abadd0n uses a decoder-only transformer architecture with:
 | `train.py` | Character-level pre-train (`llm.py` + `data.txt`) |
 | `llm.py` | Small custom decoder for `train.py` |
 | `dataset_builder.py` | Helpers for building / checking data |
-| `venv_check.py` | Ensures main/export/train run inside venv_win or venv_wsl |
+| `venv_check.py` | Ensures main/export/train run inside venv_win, venv_wsl, or venv |
 | `check_torch.py`, `debug_unsloth.py` | Diagnostics |
 | `requirements.txt` | Windows + CUDA 12.1 PyTorch stack + googlesearch-python (full install) |
 | `setup.bat` | `cd` to repo, creates `venv_win\`, `pip install -r requirements.txt`, verifies PyTorch + `pre_unsloth` inductor compat |
 | `linux/setup_wsl.sh` | WSL: caches under `~/.cache`, `requirements_wsl.txt`, runs `linux/wsl_check.py` (full Unsloth import) |
 | `linux/setup.sh` | Native Linux: `venv/` + CPU PyTorch + `requirements_wsl.txt` + `pre_unsloth` check; on WSL delegates to `setup_wsl.sh` |
-| `linux/requirements_wsl.txt` | Unsloth + TRL + pinned HF (no PyTorch — install torch in venv first on Linux) |
+| `linux/requirements_wsl.txt` | Unsloth + TRL + pinned HF + rich/readchar + web search (no PyTorch — install torch in venv first on Linux) |
 | `linux/wsl_check.py` | Torch + `pre_unsloth` + inductor assert + `import unsloth` (use after Linux/WSL install) |
 
 | `assets/abaddon-cli.png` | README hero image (CLI screenshot) |
@@ -189,6 +189,7 @@ More detail: `linux/README.md`.
 ```bash
 venv_win\Scripts\activate    # Windows
 source venv_wsl/bin/activate # WSL
+source venv/bin/activate     # Native Linux
 cd /path/to/Abadd0n-4B
 ```
 
@@ -219,6 +220,7 @@ This merges LoRA, exports to GGUF, writes a Modelfile with the Abadd0n persona, 
 # Activate venv first (required — ensures LoRA/updates load correctly)
 venv_win\Scripts\activate    # Windows
 source venv_wsl/bin/activate # WSL
+source venv/bin/activate     # Native Linux
 
 python main.py
 # or
